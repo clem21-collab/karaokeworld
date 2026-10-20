@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
+let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
 const APP_VERSION="0.19.1";
 let waitingWorker=null, updateReloading=false;
@@ -32,7 +33,7 @@ function getAll(){return new Promise((res,rej)=>{const r=tx().getAll();r.onsucce
 function deleteAll(){return new Promise((res,rej)=>{const r=tx("readwrite").clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function currentPlaylist(){return playlists.find(p=>p.id===currentPlaylistId)||playlists[0]}
-function syncQueue(){const p=currentPlaylist();queueIds=p?p.trackIds:[];localStorage.setItem("kw_playlists",JSON.stringify(playlists));localStorage.setItem("kw_current_playlist",currentPlaylistId);localStorage.setItem("kw_queue",JSON.stringify(queueIds))}
+function syncQueue(){const p=currentPlaylist();queueIds=p?p.trackIds:[];localStorage.setItem("kw_playlists",JSON.stringify(playlists));localStorage.setItem("kw_current_playlist",currentPlaylistId);localStorage.setItem("kw_queue",JSON.stringify(queueIds));scheduleCloudSave()}
 function visible(){const q=$("query").value.toLowerCase().trim();let arr=tracks.filter(t=>(activeGenre==="Tous"||t.genre===activeGenre)&&(!$("favoritesOnly").checked||favorites.includes(t.id))&&(!q||(t.title+" "+t.artist+" "+t.genre).toLowerCase().includes(q)));const sort=$("sort").value;if(sort==="artist")arr.sort((a,b)=>a.artist.localeCompare(b.artist,"fr"));else if(sort==="recent")arr.sort((a,b)=>(b.created||0)-(a.created||0));else arr.sort((a,b)=>a.title.localeCompare(b.title,"fr"));return arr}
 function drawHomeShelves(){const favBox=$("homeFavorites"),popBox=$("homePopular");if(!favBox||!popBox)return;const card=t=>`<article class="home-card" onclick="homePick('${t.id}')"><div class="home-emoji">${t.emoji||"🎵"}</div><b>${esc(t.title)}</b><span>${esc(t.artist)}</span></article>`;const fav=tracks.filter(t=>favorites.includes(t.id)).slice(0,4);favBox.innerHTML=fav.length?fav.map(card).join(""):'<div class="home-card empty-card">☆ Ajoutez des favoris depuis votre bibliothèque.</div>';popBox.innerHTML=tracks.slice(0,4).map(card).join("")}
 function homePick(id){const t=tracks.find(x=>x.id===id);if(!t)return;if(t.kind==="demo"){searchYouTubeFor(t.title+" "+t.artist);return}playTrack(id)}
@@ -42,7 +43,7 @@ function drawQueue(){$("queue").innerHTML=queueIds.length?queueIds.map((id,i)=>{
 function saveQueue(){syncQueue();drawPlaylists()}
 function addQueue(id){const p=currentPlaylist();if(!p)return;if(!p.trackIds.includes(id)){p.trackIds.push(id);syncQueue();drawPlaylists()}else{$("backupStatus").textContent="Ce titre est déjà dans cette playlist."}}
 function removeQueue(i){queueIds.splice(i,1);syncQueue();drawPlaylists()}
-function toggleFavorite(id){favorites=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];localStorage.setItem("kw_favorites",JSON.stringify(favorites));drawTracks()}
+function toggleFavorite(id){favorites=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];localStorage.setItem("kw_favorites",JSON.stringify(favorites));drawTracks();scheduleCloudSave()}
 function createPlaylist(){const name=prompt("Nom de la nouvelle playlist :","Ma playlist");if(!name||!name.trim())return;const p={id:"pl_"+crypto.randomUUID(),name:name.trim().slice(0,60),trackIds:[]};playlists.push(p);currentPlaylistId=p.id;syncQueue();drawPlaylists();$("backupStatus").textContent="Playlist créée."}
 function renamePlaylist(){const p=currentPlaylist();if(!p)return;const name=prompt("Nouveau nom de la playlist :",p.name);if(!name||!name.trim())return;p.name=name.trim().slice(0,60);syncQueue();drawPlaylists()}
 function deletePlaylist(){if(playlists.length<=1)return;const p=currentPlaylist();if(!p||!confirm(`Supprimer la playlist « ${p.name} » ? Les fichiers de la bibliothèque ne seront pas supprimés.`))return;playlists=playlists.filter(x=>x.id!==p.id);currentPlaylistId=playlists[0].id;syncQueue();drawPlaylists()}
@@ -287,3 +288,23 @@ document.addEventListener('keydown',e=>{const open=!$("karaokeStage").classList.
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&!$("karaokeStage").classList.contains('hidden')){const yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}$("karaokeStage").classList.add('hidden');$("karaokeStage").setAttribute('aria-hidden','true')}});
 
 boot();
+
+
+// --- v0.19.4 : compte Google + synchronisation Firestore ---
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyAVxeozSOPKTzK4KPvSR3l6w6_i2P1J3Uw",
+  authDomain:"karaokeworld-d503f.firebaseapp.com",
+  projectId:"karaokeworld-d503f",
+  storageBucket:"karaokeworld-d503f.firebasestorage.app",
+  messagingSenderId:"678274820219",
+  appId:"1:678274820219:web:9f6e3a972995325fe69ade",
+  measurementId:"G-YPC26NZFJS"
+};
+function cloudPayload(){return {favorites:[...new Set(favorites)],playlists:playlists.map(p=>({id:p.id,name:p.name,trackIds:[...(p.trackIds||[])]})),currentPlaylistId,youtubeMode,lyricOffset,updatedAt:Date.now(),schema:1}}
+function scheduleCloudSave(){if(!cloudUser||!cloudApi||cloudApplying)return;clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(()=>saveCloud(false),700)}
+async function saveCloud(show=true){if(!cloudUser||!cloudApi)return;try{if(show)$('cloudStatus').textContent='Synchronisation en cours…';await cloudApi.setDoc(cloudApi.doc(cloudApi.fs,'users',cloudUser.uid),cloudPayload(),{merge:true});$('cloudStatus').textContent='✓ Synchronisé avec le cloud à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}catch(e){$('cloudStatus').textContent='Synchronisation impossible : '+e.message}}
+function mergePlaylists(local,remote){const map=new Map();for(const p of [...(remote||[]),...(local||[])]){if(!p?.id)continue;const prev=map.get(p.id);map.set(p.id,{id:p.id,name:p.name||prev?.name||'Playlist',trackIds:[...new Set([...(prev?.trackIds||[]),...(p.trackIds||[])])]})}return [...map.values()]}
+async function loadCloudAndMerge(){if(!cloudUser||!cloudApi)return;try{$('cloudStatus').textContent='Récupération de tes données…';const ref=cloudApi.doc(cloudApi.fs,'users',cloudUser.uid), snap=await cloudApi.getDoc(ref);cloudApplying=true;if(snap.exists()){const r=snap.data()||{};favorites=[...new Set([...(r.favorites||[]),...favorites])];playlists=mergePlaylists(playlists,r.playlists);if(r.youtubeMode==='karaoke'||r.youtubeMode==='original')youtubeMode=r.youtubeMode;if(Number.isFinite(r.lyricOffset))lyricOffset=r.lyricOffset;const wanted=r.currentPlaylistId;if(wanted&&playlists.some(p=>p.id===wanted))currentPlaylistId=wanted;localStorage.setItem('kw_favorites',JSON.stringify(favorites));localStorage.setItem('kw_playlists',JSON.stringify(playlists));localStorage.setItem('kw_current_playlist',currentPlaylistId);localStorage.setItem('kw_queue',JSON.stringify(currentPlaylist()?.trackIds||[]));drawTracks();drawPlaylists();$('cloudStatus').textContent='✓ Données de cet appareil fusionnées avec ton compte.'}else{$('cloudStatus').textContent='Premier appareil : création de ta sauvegarde cloud…'}cloudApplying=false;await saveCloud(false)}catch(e){cloudApplying=false;$('cloudStatus').textContent='Synchronisation impossible : '+e.message}}
+function updateCloudUI(user){cloudUser=user||null;$('cloudSignedOut')?.classList.toggle('hidden',!!user);$('cloudSignedIn')?.classList.toggle('hidden',!user);if(user){$('cloudUserName').textContent=user.displayName||'Compte Google';$('cloudUserEmail').textContent=user.email||''}else $('cloudStatus').textContent='Synchronisation désactivée tant que tu n’es pas connecté.'}
+async function initCloud(){try{const [{initializeApp},{getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js')]);const app=initializeApp(FIREBASE_CONFIG),auth=getAuth(app),fs=getFirestore(app);cloudApi={auth,fs,GoogleAuthProvider,signInWithPopup,signOut,doc,getDoc,setDoc};$('googleSignIn').onclick=async()=>{try{$('cloudStatus').textContent='Connexion Google…';await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){$('cloudStatus').textContent='Connexion impossible : '+e.message}};$('googleSignOut').onclick=()=>signOut(auth);$('syncNow').onclick=()=>saveCloud(true);onAuthStateChanged(auth,async user=>{updateCloudUI(user);if(user)await loadCloudAndMerge()})}catch(e){$('cloudStatus').textContent='Service cloud indisponible : '+e.message}}
+if(location.protocol!=='file:')initCloud();
