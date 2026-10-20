@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
-let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, raf=0, installPrompt=null;
+let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, raf=0, installPrompt=null, youtubeMode="karaoke";
 const demo=[
 ["Dernière danse","Indila","Variété française","🌙"],["Believer","Imagine Dragons","Rock","⚡"],["Someone Like You","Adele","Pop","💜"],["Shape of You","Ed Sheeran","Pop","🎸"],["J'irai où tu iras","Céline Dion","Variété française","🌟"],["Bohemian Rhapsody","Queen","Rock","👑"],["Alors on danse","Stromae","Rap","🎧"],["Fly Me to the Moon","Frank Sinatra","Jazz","🌃"]
 ].map((x,i)=>({id:"demo"+i,title:x[0],artist:x[1],genre:x[2],emoji:x[3],kind:"demo",url:"",created:i}));
@@ -53,6 +53,17 @@ function youtubeEmbed(id,title="Vidéo YouTube"){
   $("youtubePlayer").classList.remove("hidden"); $("youtubePlayer").scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 const YT_KEY_STORAGE="karaokeworld_youtube_api_key_v1";
+function setYoutubeMode(mode){
+  youtubeMode=mode==="original"?"original":"karaoke";
+  $("modeKaraoke").classList.toggle("active",youtubeMode==="karaoke");
+  $("modeKaraoke").classList.toggle("secondary",youtubeMode!=="karaoke");
+  $("modeOriginal").classList.toggle("active",youtubeMode==="original");
+  $("modeOriginal").classList.toggle("secondary",youtubeMode!=="original");
+  $("youtubeModeHelp").textContent=youtubeMode==="karaoke"?"Mode Karaoké : recherche en priorité des versions karaoké/instrumentales sans voix principale.":"Mode Original : recherche la chanson avec la voix du chanteur. Certaines vidéos officielles peuvent interdire la lecture intégrée.";
+}
+$("modeKaraoke").onclick=()=>setYoutubeMode("karaoke");
+$("modeOriginal").onclick=()=>setYoutubeMode("original");
+setYoutubeMode("karaoke");
 $("youtubeApiKey").value=localStorage.getItem(YT_KEY_STORAGE)||"";
 $("saveYoutubeKey").onclick=()=>{const k=$("youtubeApiKey").value.trim();if(!k){$("onlineStatus").textContent="Colle d’abord ta clé YouTube Data API.";return}localStorage.setItem(YT_KEY_STORAGE,k);$("onlineStatus").textContent="Clé enregistrée uniquement dans ce navigateur."};
 $("forgetYoutubeKey").onclick=()=>{localStorage.removeItem(YT_KEY_STORAGE);$("youtubeApiKey").value="";$("onlineStatus").textContent="Clé YouTube oubliée sur cet appareil."};
@@ -63,14 +74,15 @@ async function searchYouTubeCompatible(query){
   $("youtubeResults").innerHTML='<p class="empty">Recherche YouTube en cours…</p>';
   $("onlineStatus").textContent="Recherche de vidéos intégrables…";
   try{
-    const params=new URLSearchParams({part:"snippet",type:"video",maxResults:"12",q:q+" karaoké",videoEmbeddable:"true",videoSyndicated:"true",relevanceLanguage:"fr",regionCode:"FR",safeSearch:"moderate",key});
+    const searchText=youtubeMode==="karaoke" ? q+" karaoké instrumental" : q+" officiel audio";
+    const params=new URLSearchParams({part:"snippet",type:"video",maxResults:"12",q:searchText,videoEmbeddable:"true",videoSyndicated:"true",relevanceLanguage:"fr",regionCode:"FR",safeSearch:"moderate",key});
     const r=await fetch("https://www.googleapis.com/youtube/v3/search?"+params.toString()); const data=await r.json();
     if(!r.ok) throw new Error(data?.error?.message||("Erreur YouTube "+r.status));
     const items=(data.items||[]).filter(x=>x.id&&x.id.videoId);
     if(!items.length){$("youtubeResults").innerHTML='<p class="empty">Aucune vidéo intégrable trouvée pour cette recherche.</p>';$("onlineStatus").textContent="Aucun résultat compatible. Essaie un titre ou un artiste un peu différent.";return}
     $("youtubeResults").innerHTML=items.map(x=>{const id=x.id.videoId, sn=x.snippet||{}, thumb=sn.thumbnails?.medium?.url||sn.thumbnails?.default?.url||"";return `<article class="youtube-result"><img src="${esc(thumb)}" alt="" loading="lazy"><div class="youtube-result-info"><h3>${esc(sn.title||"Vidéo YouTube")}</h3><p>${esc(sn.channelTitle||"")}</p><button class="play-youtube-result" data-id="${esc(id)}" data-title="${esc(sn.title||"")}">▶ Lire dans KaraokeWorld</button><a class="yt-open" href="https://www.youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener noreferrer">Voir sur YouTube</a></div></article>`}).join("");
     document.querySelectorAll(".play-youtube-result").forEach(b=>b.onclick=()=>{youtubeEmbed(b.dataset.id,b.dataset.title);$("onlineStatus").textContent="Vidéo sélectionnée. YouTube l’a signalée comme intégrable au moment de la recherche."});
-    $("onlineStatus").textContent=items.length+" vidéo(s) compatible(s) trouvée(s).";
+    $("onlineStatus").textContent=items.length+" vidéo(s) compatible(s) trouvée(s) en mode "+(youtubeMode==="karaoke"?"Karaoké":"Original")+".";
   }catch(e){$("youtubeResults").innerHTML='<p class="empty">Impossible d’effectuer la recherche YouTube.</p>';$("onlineStatus").textContent="Erreur YouTube : "+e.message+". Vérifie que YouTube Data API v3 est activée et que la clé autorise ton domaine GitHub Pages."}
 }
 function searchYouTubeFor(query){$("onlineQuery").value=query.trim();searchYouTubeCompatible(query);$("online").scrollIntoView({behavior:"smooth",block:"start"})}
@@ -82,7 +94,7 @@ async function searchOnlineLyrics(){
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.5"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.8"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
