@@ -49,11 +49,33 @@ function youtubeVideoId(value){try{const u=new URL(value.trim());if(u.hostname==
 function parseLrc(text){const parsed=[];for(const line of (text||"").split(/\r?\n/)){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}return parsed}
 function ensureYouTubeApi(){return new Promise((resolve,reject)=>{if(window.YT&&YT.Player)return resolve();const old=window.onYouTubeIframeAPIReady;window.onYouTubeIframeAPIReady=()=>{if(typeof old==="function")old();resolve()};if(!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')){const sc=document.createElement("script");sc.src="https://www.youtube.com/iframe_api";sc.onerror=()=>reject(new Error("Impossible de charger le lecteur YouTube."));document.head.appendChild(sc)}})}
 function startYoutubeSync(){clearInterval(ytTimer);ytTimer=setInterval(()=>{try{if(!ytPlayer||typeof ytPlayer.getCurrentTime!=="function")return;const sec=ytPlayer.getCurrentTime()||0,dur=ytPlayer.getDuration()||0;$('elapsed').textContent=fmt(sec);$('duration').textContent=fmt(dur);if(dur)$('seek').value=sec/dur*100;renderLyrics(Math.max(0,sec+lyricOffset))}catch(e){}},200)}
-async function autoLyricsForYouTube(query){const q=(query||"").trim();if(!q)return;$('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";try{const res=await fetch("https://lrclib.net/api/search?q="+encodeURIComponent(q),{headers:{"Lrclib-Client":"KaraokeWorld v0.9"}});if(!res.ok)throw new Error("LRCLIB indisponible");const items=await res.json();const hit=(items||[]).find(x=>x.syncedLyrics);if(!hit){lrc=[];renderLyrics(0);$('state').textContent="Vidéo YouTube · paroles synchronisées introuvables";$('lyricsResults').innerHTML='<p class="empty">La vidéo fonctionne, mais LRCLIB n’a pas trouvé automatiquement de paroles synchronisées. Tu peux utiliser la recherche manuelle juste ici.</p>';return}lrc=parseLrc(hit.syncedLyrics);$('lyricsQuery').value=hit.trackName||q;$('lyricsArtist').value=hit.artistName||"";$('state').textContent="YouTube + paroles synchronisées";$('lyricsResults').innerHTML=`<article class="lyric-result"><h3>${esc(hit.trackName||q)}</h3><p>${esc(hit.artistName||"")} · ✓ chargées automatiquement</p></article>`;renderLyrics(0);$('player').scrollIntoView({behavior:"smooth",block:"nearest"})}catch(e){$('state').textContent="Vidéo YouTube · paroles non chargées";$('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`}}
+function normMatch(x){return String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
+function cleanYoutubeTitle(x){return String(x||"").replace(/\([^)]*(official|officiel|lyrics?|paroles|karaoke|karaoké|audio|video|clip)[^)]*\)/ig," ").replace(/\[[^\]]*(official|officiel|lyrics?|paroles|karaoke|karaoké|audio|video|clip)[^\]]*\]/ig," ").replace(/\b(official|officiel|lyrics?|paroles|karaoke|karaoké|instrumental|audio|video|clip|hd|4k)\b/ig," ").replace(/\s+/g," ").trim()}
+function guessTitleArtist(query,videoTitle=""){
+  let q=String(query||"").trim(), v=cleanYoutubeTitle(videoTitle), title=q, artist="";
+  const split=s=>{for(const sep of [" - "," – "," — "," | "]){if(s.includes(sep)){const a=s.split(sep).map(x=>x.trim()).filter(Boolean);if(a.length>=2)return [a[0],a[1]]}}return null};
+  let parts=split(v)||split(q);if(parts){artist=parts[0];title=parts[1]}else if($("lyricsArtist")?.value.trim()){artist=$("lyricsArtist").value.trim();title=$("lyricsQuery")?.value.trim()||q}
+  return {title:cleanYoutubeTitle(title),artist:cleanYoutubeTitle(artist)}
+}
+async function autoLyricsForYouTube(query,videoTitle=""){
+  const q=(query||"").trim();if(!q)return;const guessed=guessTitleArtist(q,videoTitle);const title=guessed.title||q,artist=guessed.artist;
+  $('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";
+  try{
+    const headers={"Lrclib-Client":"KaraokeWorld v0.10"}, urls=[];
+    if(artist)urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
+    urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
+    let all=[];for(const url of urls){const res=await fetch(url,{headers});if(!res.ok)continue;const found=await res.json();if(Array.isArray(found))all.push(...found)}
+    const seen=new Set();const items=all.filter(x=>{const k=x.id??[x.trackName,x.artistName,x.albumName].join("|");if(seen.has(k))return false;seen.add(k);return !!x.syncedLyrics});
+    const nt=normMatch(title),na=normMatch(artist);const score=x=>{const tt=normMatch(x.trackName),aa=normMatch(x.artistName);let s=0;if(tt===nt)s+=10;else if(tt.includes(nt)||nt.includes(tt))s+=5;if(na){if(aa===na)s+=10;else if(aa.includes(na)||na.includes(aa))s+=5;else s-=8}return s};
+    items.sort((a,b)=>score(b)-score(a));const hit=items[0],good=hit&&score(hit)>=(artist?15:10);
+    if(!good){lrc=[];renderLyrics(0);$('state').textContent="Vidéo YouTube · aucune correspondance exacte";$('lyricsQuery').value=title;$('lyricsArtist').value=artist;$('lyricsResults').innerHTML='<p class="empty">Aucune correspondance exacte titre + artiste n’a été trouvée. KaraokeWorld n’a chargé aucune parole pour éviter une mauvaise chanson. Vérifie les champs Titre et Artiste puis lance la recherche manuelle.</p>';return}
+    lrc=parseLrc(hit.syncedLyrics);$('lyricsQuery').value=hit.trackName||title;$('lyricsArtist').value=hit.artistName||artist;$('state').textContent="YouTube + paroles synchronisées";$('lyricsResults').innerHTML=`<article class="lyric-result"><h3>${esc(hit.trackName||title)}</h3><p>${esc(hit.artistName||artist)} · ✓ correspondance vérifiée et chargée automatiquement</p></article>`;renderLyrics(0);$('player').scrollIntoView({behavior:"smooth",block:"nearest"})
+  }catch(e){$('state').textContent="Vidéo YouTube · paroles non chargées";$('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`}
+}
 async function youtubeEmbed(id,title="Vidéo YouTube",query=""){
   const watch=`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;youtubeQuery=(query||$('onlineQuery').value||title).trim();currentId=null;$('audio').pause();$('video').pause();$('audio').classList.add('hidden');$('video').classList.add('hidden');lrc=[];renderLyrics(0);
   $('youtubePlayer').innerHTML=`<div class="youtube-frame"><div id="ytApiPlayer"></div></div><div class="youtube-fallback"><span>Lecture YouTube synchronisée avec les paroles.</span><a class="button-link" href="${watch}" target="_blank" rel="noopener noreferrer">▶ Ouvrir sur YouTube</a></div>`;$('youtubePlayer').classList.remove('hidden');
-  try{await ensureYouTubeApi();if(ytPlayer&&typeof ytPlayer.destroy==="function")try{ytPlayer.destroy()}catch(e){}ytPlayer=new YT.Player('ytApiPlayer',{videoId:id,playerVars:{rel:0,playsinline:1,origin:(location.protocol==='http:'||location.protocol==='https:')?location.origin:undefined},events:{onReady:()=>{startYoutubeSync();autoLyricsForYouTube(youtubeQuery)},onStateChange:e=>{if(e.data===YT.PlayerState.PLAYING)startYoutubeSync()}}});}catch(e){$('onlineStatus').textContent=e.message}
+  try{await ensureYouTubeApi();if(ytPlayer&&typeof ytPlayer.destroy==="function")try{ytPlayer.destroy()}catch(e){}ytPlayer=new YT.Player('ytApiPlayer',{videoId:id,playerVars:{rel:0,playsinline:1,origin:(location.protocol==='http:'||location.protocol==='https:')?location.origin:undefined},events:{onReady:()=>{startYoutubeSync();autoLyricsForYouTube(youtubeQuery,title)},onStateChange:e=>{if(e.data===YT.PlayerState.PLAYING)startYoutubeSync()}}});}catch(e){$('onlineStatus').textContent=e.message}
   $('youtubePlayer').scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 const YT_KEY_STORAGE="karaokeworld_youtube_api_key_v1";
@@ -70,7 +92,7 @@ async function searchOnlineLyrics(){
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.8"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.10"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
