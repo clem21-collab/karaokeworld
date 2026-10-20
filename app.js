@@ -50,7 +50,52 @@ function searchYouTubeFor(query){const q=query.trim();if(!q){$("onlineStatus").t
 $("searchEverywhere").onclick=()=>searchYouTubeFor($("query").value);$("query").addEventListener("keydown",e=>{if(e.key==="Enter")searchYouTubeFor($("query").value)});
 $("youtubeSearch").onclick=()=>searchYouTubeFor($("onlineQuery").value);$("onlineQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("youtubeSearch").click()});
 $("loadYoutube").onclick=()=>{const id=youtubeVideoId($("youtubeUrl").value);if(!id){$("onlineStatus").textContent="Lien YouTube non reconnu. Colle un lien de type youtube.com/watch?v=… ou youtu.be/…";return}$("youtubePlayer").innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}" title="Lecteur karaoké YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;$("youtubePlayer").classList.remove("hidden");$("onlineStatus").textContent="Vidéo chargée. Appuie sur Lecture dans le lecteur. Certaines vidéos interdisent la lecture intégrée.";$("youtubePlayer").scrollIntoView({behavior:"smooth",block:"nearest"})};$("youtubeUrl").addEventListener("keydown",e=>{if(e.key==="Enter")$("loadYoutube").click()});
-async function searchOnlineLyrics(){const q=$("lyricsQuery").value.trim(),out=$("lyricsResults");if(!q){out.innerHTML='<p class="empty">Saisis un titre ou un artiste.</p>';return}out.innerHTML='<p class="empty">Recherche en cours…</p>';try{const res=await fetch("https://lrclib.net/api/search?q="+encodeURIComponent(q),{headers:{"Lrclib-Client":"KaraokeWorld v0.4"}});if(!res.ok)throw new Error(res.status===429?"Trop de recherches en peu de temps. Réessaie plus tard.":"Le service de paroles est temporairement indisponible.");const items=await res.json();if(!items.length){out.innerHTML='<p class="empty">Aucun résultat. Essaie avec le titre exact et le nom de l’artiste.</p>';return}out.innerHTML=items.slice(0,10).map((t,i)=>`<article class="lyric-result"><h3>${esc(t.trackName||t.name||"Titre inconnu")}</h3><p>${esc(t.artistName||"Artiste inconnu")}${t.albumName?" · "+esc(t.albumName):""}</p><p>${t.syncedLyrics?"✓ Paroles synchronisées":t.plainLyrics?"Paroles non synchronisées":"Aucune parole disponible"}</p><div class="controls"><button class="secondary" data-preview="${i}">Aperçu</button>${t.syncedLyrics?`<button data-use="${i}">Utiliser les paroles</button>`:""}</div><pre class="lyric-preview hidden" id="lyric-preview-${i}"></pre></article>`).join("");items.slice(0,10).forEach((t,i)=>{const prev=$("lyricsResults").querySelector(`[data-preview="${i}"]`);prev.onclick=()=>{const el=$("lyric-preview-"+i);el.textContent=t.syncedLyrics||t.plainLyrics||"Aucune parole disponible.";el.classList.toggle("hidden")};const use=$("lyricsResults").querySelector(`[data-use="${i}"]`);if(use)use.onclick=()=>{if(!currentId){alert("Sélectionne d’abord une chanson de ta bibliothèque ou importe un fichier audio/vidéo, puis reviens ici.");return}const parsed=[];for(const line of (t.syncedLyrics||"") .split(String.fromCharCode(10))){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,2})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}if(!parsed.length){alert("Aucune ligne synchronisée exploitable dans ce résultat.");return}const track=tracks.find(x=>x.id===currentId);if(!track)return;track.lrc=parsed;saveTrack(track).then(()=>{lrc=parsed;renderLyrics(0);$("state").textContent="Paroles LRC chargées";$("player").scrollIntoView({behavior:"smooth",block:"nearest"})}).catch(e=>alert("Impossible de sauvegarder les paroles : "+e.message))}})}catch(e){out.innerHTML=`<p class="empty">${esc(e.message||"Erreur pendant la recherche.")}</p>`}}
-$("searchLyrics").onclick=searchOnlineLyrics;$("lyricsQuery").addEventListener("keydown",e=>{if(e.key==="Enter")searchOnlineLyrics()});
+async function searchOnlineLyrics(){
+  const title=$("lyricsQuery").value.trim(), artist=$("lyricsArtist")?.value.trim()||"", out=$("lyricsResults");
+  if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
+  out.innerHTML='<p class="empty">Recherche en cours…</p>';
+  try{
+    const headers={"Lrclib-Client":"KaraokeWorld v0.5"};
+    const urls=[];
+    if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
+    urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
+    if(artist) urls.push("https://lrclib.net/api/search?q="+encodeURIComponent(title));
+    let all=[];
+    for(const url of urls){
+      const res=await fetch(url,{headers});
+      if(res.status===429) throw new Error("Trop de recherches en peu de temps. Réessaie dans quelques instants.");
+      if(!res.ok) continue;
+      const found=await res.json();
+      if(Array.isArray(found)) all.push(...found);
+      if(found?.length) break;
+      await new Promise(r=>setTimeout(r,250));
+    }
+    const seen=new Set();
+    let items=all.filter(t=>{const k=t.id??[t.trackName,t.artistName,t.albumName,t.duration].join("|");if(seen.has(k))return false;seen.add(k);return true});
+    const norm=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const nt=norm(title), na=norm(artist);
+    items.sort((a,b)=>{
+      const score=x=>(norm(x.trackName)===nt?8:norm(x.trackName).includes(nt)?4:0)+(na?(norm(x.artistName)===na?6:norm(x.artistName).includes(na)?3:0):0)+(x.syncedLyrics?2:x.plainLyrics?1:0);
+      return score(b)-score(a);
+    });
+    if(!items.length){out.innerHTML='<p class="empty">Aucun résultat. Vérifie le titre et l’artiste, puis réessaie.</p>';return}
+    const shown=items.slice(0,10);
+    out.innerHTML=shown.map((t,i)=>`<article class="lyric-result"><h3>${esc(t.trackName||t.name||"Titre inconnu")}</h3><p>${esc(t.artistName||"Artiste inconnu")}${t.albumName?" · "+esc(t.albumName):""}</p><p>${t.syncedLyrics?"✓ Paroles synchronisées":t.plainLyrics?"Paroles non synchronisées":"Aucune parole disponible"}</p><div class="controls"><button class="secondary" data-preview="${i}">Aperçu</button>${t.syncedLyrics?`<button data-use="${i}">Utiliser les paroles</button>`:""}</div><pre class="lyric-preview hidden" id="lyric-preview-${i}"></pre></article>`).join("");
+    shown.forEach((t,i)=>{
+      const prev=out.querySelector(`[data-preview="${i}"]`);
+      prev.onclick=()=>{const el=$("lyric-preview-"+i);el.textContent=t.syncedLyrics||t.plainLyrics||"Aucune parole disponible.";el.classList.toggle("hidden")};
+      const use=out.querySelector(`[data-use="${i}"]`);
+      if(use)use.onclick=()=>{
+        if(!currentId){alert("Sélectionne d’abord une chanson de ta bibliothèque ou importe un fichier audio/vidéo, puis reviens ici.");return}
+        const parsed=[];
+        for(const line of (t.syncedLyrics||"").split(String.fromCharCode(10))){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}
+        if(!parsed.length){alert("Aucune ligne synchronisée exploitable dans ce résultat.");return}
+        const track=tracks.find(x=>x.id===currentId);if(!track)return;track.lrc=parsed;
+        saveTrack(track).then(()=>{lrc=parsed;renderLyrics(0);$("state").textContent="Paroles LRC chargées";$("player").scrollIntoView({behavior:"smooth",block:"nearest"})}).catch(e=>alert("Impossible de sauvegarder les paroles : "+e.message));
+      };
+    });
+  }catch(e){out.innerHTML=`<p class="empty">${esc(e.message||"Erreur pendant la recherche.")}</p>`}
+}
+$("searchLyrics").onclick=searchOnlineLyrics;$("lyricsQuery").addEventListener("keydown",e=>{if(e.key==="Enter")searchOnlineLyrics()});$("lyricsArtist")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchOnlineLyrics()});
 
 boot();
