@@ -1,7 +1,7 @@
 {
   "name": "KaraokeWorld",
   "short_name": "KaraokeWorld",
-  "description": "Karaoké local et en ligne",
+  "description": "Karaoké gratuit en ligne avec vidéos compatibles, paroles synchronisées, playlists et mode plein écran.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#07111f",

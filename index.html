@@ -2,9 +2,34 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#091426"><meta name="description" content="KaraokeWorld : karaoké local et en ligne, playlists sauvegardées et test micro.">
-<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./style.css">
-<title>KaraokeWorld v0.16</title>
+<meta name="theme-color" content="#091426">
+<title>KaraokeWorld – Karaoké gratuit en ligne</title>
+<meta name="description" content="KaraokeWorld est une application de karaoké gratuite en ligne : recherchez une chanson, lancez une vidéo YouTube compatible et chantez avec des paroles synchronisées.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="application-name" content="KaraokeWorld">
+<meta name="author" content="KaraokeWorld">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="KaraokeWorld">
+<meta property="og:title" content="KaraokeWorld – Karaoké gratuit en ligne">
+<meta property="og:description" content="Choisissez une chanson, lancez une vidéo compatible et chantez avec des paroles synchronisées.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KaraokeWorld – Karaoké gratuit en ligne">
+<meta name="twitter:description" content="Karaoké gratuit en ligne avec vidéos compatibles et paroles synchronisées.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./style.css">
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"WebApplication",
+  "name":"KaraokeWorld",
+  "applicationCategory":"MultimediaApplication",
+  "operatingSystem":"ChromeOS, Windows, macOS, Linux, Android",
+  "inLanguage":"fr",
+  "description":"Application de karaoké gratuite en ligne avec recherche de vidéos compatibles et paroles synchronisées.",
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}
+}
+</script>
 </head>
 <body>
 <header><div class="brand">🎤 Karaoke<span>World</span><small> BETA</small></div><div class="top-actions"><button id="install" class="secondary hidden">Installer l’application</button><button id="import">＋ Importer</button><input id="files" type="file" accept="audio/*,video/*,.lrc,.txt" multiple hidden></div></header>
