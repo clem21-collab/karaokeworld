@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://clem21-collab.github.io/karaokeworld/sitemap.xml
