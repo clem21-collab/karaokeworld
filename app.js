@@ -46,10 +46,37 @@ document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{document.quer
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installPrompt=e;$("install").classList.remove("hidden")});$("install").onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$("install").classList.add("hidden")}};
 
 function youtubeVideoId(value){try{const u=new URL(value.trim());if(u.hostname==="youtu.be")return u.pathname.split("/").filter(Boolean)[0]||"";if(u.hostname.endsWith("youtube.com")||u.hostname.endsWith("youtube-nocookie.com")){if(u.pathname==="/watch")return u.searchParams.get("v")||"";const m=u.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/);return m?m[1]:""}}catch(e){}return ""}
-function searchYouTubeFor(query){const q=query.trim();if(!q){$("onlineStatus").textContent="Saisis un titre ou un artiste pour lancer la recherche.";return}$("onlineQuery").value=q;window.open("https://www.youtube.com/results?search_query="+encodeURIComponent(q+" karaoké"),"_blank","noopener,noreferrer");$("onlineStatus").textContent="Recherche YouTube ouverte dans un nouvel onglet pour : "+q+". La bibliothèque locale, elle, ne contient que les fichiers importés et les titres de démonstration.";$("online").scrollIntoView({behavior:"smooth",block:"start"})}
+function youtubeEmbed(id,title="Vidéo YouTube"){
+  const watch=`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  const origin=(location.protocol==="http:"||location.protocol==="https:")?`&origin=${encodeURIComponent(location.origin)}`:"";
+  $("youtubePlayer").innerHTML=`<div class="youtube-frame"><iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}?rel=0&playsinline=1${origin}" title="${esc(title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div><div class="youtube-fallback"><span>Cette vidéo est chargée depuis YouTube.</span><a class="button-link" href="${watch}" target="_blank" rel="noopener noreferrer">▶ Ouvrir sur YouTube</a></div>`;
+  $("youtubePlayer").classList.remove("hidden"); $("youtubePlayer").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+const YT_KEY_STORAGE="karaokeworld_youtube_api_key_v1";
+$("youtubeApiKey").value=localStorage.getItem(YT_KEY_STORAGE)||"";
+$("saveYoutubeKey").onclick=()=>{const k=$("youtubeApiKey").value.trim();if(!k){$("onlineStatus").textContent="Colle d’abord ta clé YouTube Data API.";return}localStorage.setItem(YT_KEY_STORAGE,k);$("onlineStatus").textContent="Clé enregistrée uniquement dans ce navigateur."};
+$("forgetYoutubeKey").onclick=()=>{localStorage.removeItem(YT_KEY_STORAGE);$("youtubeApiKey").value="";$("onlineStatus").textContent="Clé YouTube oubliée sur cet appareil."};
+async function searchYouTubeCompatible(query){
+  const q=query.trim(); if(!q){$("onlineStatus").textContent="Saisis un titre ou un artiste.";return}
+  const key=$("youtubeApiKey").value.trim()||localStorage.getItem(YT_KEY_STORAGE)||"";
+  if(!key){$("onlineStatus").textContent="Ajoute d’abord une clé YouTube Data API v3. Sans clé, KaraokeWorld ne peut pas filtrer automatiquement les vidéos intégrables.";return}
+  $("youtubeResults").innerHTML='<p class="empty">Recherche YouTube en cours…</p>';
+  $("onlineStatus").textContent="Recherche de vidéos intégrables…";
+  try{
+    const params=new URLSearchParams({part:"snippet",type:"video",maxResults:"12",q:q+" karaoké",videoEmbeddable:"true",videoSyndicated:"true",relevanceLanguage:"fr",regionCode:"FR",safeSearch:"moderate",key});
+    const r=await fetch("https://www.googleapis.com/youtube/v3/search?"+params.toString()); const data=await r.json();
+    if(!r.ok) throw new Error(data?.error?.message||("Erreur YouTube "+r.status));
+    const items=(data.items||[]).filter(x=>x.id&&x.id.videoId);
+    if(!items.length){$("youtubeResults").innerHTML='<p class="empty">Aucune vidéo intégrable trouvée pour cette recherche.</p>';$("onlineStatus").textContent="Aucun résultat compatible. Essaie un titre ou un artiste un peu différent.";return}
+    $("youtubeResults").innerHTML=items.map(x=>{const id=x.id.videoId, sn=x.snippet||{}, thumb=sn.thumbnails?.medium?.url||sn.thumbnails?.default?.url||"";return `<article class="youtube-result"><img src="${esc(thumb)}" alt="" loading="lazy"><div class="youtube-result-info"><h3>${esc(sn.title||"Vidéo YouTube")}</h3><p>${esc(sn.channelTitle||"")}</p><button class="play-youtube-result" data-id="${esc(id)}" data-title="${esc(sn.title||"")}">▶ Lire dans KaraokeWorld</button><a class="yt-open" href="https://www.youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener noreferrer">Voir sur YouTube</a></div></article>`}).join("");
+    document.querySelectorAll(".play-youtube-result").forEach(b=>b.onclick=()=>{youtubeEmbed(b.dataset.id,b.dataset.title);$("onlineStatus").textContent="Vidéo sélectionnée. YouTube l’a signalée comme intégrable au moment de la recherche."});
+    $("onlineStatus").textContent=items.length+" vidéo(s) compatible(s) trouvée(s).";
+  }catch(e){$("youtubeResults").innerHTML='<p class="empty">Impossible d’effectuer la recherche YouTube.</p>';$("onlineStatus").textContent="Erreur YouTube : "+e.message+". Vérifie que YouTube Data API v3 est activée et que la clé autorise ton domaine GitHub Pages."}
+}
+function searchYouTubeFor(query){$("onlineQuery").value=query.trim();searchYouTubeCompatible(query);$("online").scrollIntoView({behavior:"smooth",block:"start"})}
 $("searchEverywhere").onclick=()=>searchYouTubeFor($("query").value);$("query").addEventListener("keydown",e=>{if(e.key==="Enter")searchYouTubeFor($("query").value)});
-$("youtubeSearch").onclick=()=>searchYouTubeFor($("onlineQuery").value);$("onlineQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("youtubeSearch").click()});
-$("loadYoutube").onclick=()=>{const raw=$("youtubeUrl").value.trim();const id=youtubeVideoId(raw);if(!id){$("onlineStatus").textContent="Lien YouTube non reconnu. Colle un lien youtube.com/watch?v=…, youtu.be/…, /shorts/ ou /live/.";return}const watch=`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;const origin=(location.protocol==="http:"||location.protocol==="https:")?`&origin=${encodeURIComponent(location.origin)}`:"";$("youtubePlayer").innerHTML=`<iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}?rel=0&playsinline=1${origin}" title="Lecteur karaoké YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe><div class="youtube-fallback"><span>Si YouTube affiche « vidéo non disponible », la vidéo peut interdire la lecture intégrée.</span><a class="button-link" href="${watch}" target="_blank" rel="noopener noreferrer">▶ Ouvrir sur YouTube</a></div>`;$("youtubePlayer").classList.remove("hidden");$("onlineStatus").textContent="Vidéo chargée dans le lecteur YouTube. Si elle refuse la lecture intégrée, utilise le bouton « Ouvrir sur YouTube » sous la vidéo.";$("youtubePlayer").scrollIntoView({behavior:"smooth",block:"nearest"})};$("youtubeUrl").addEventListener("keydown",e=>{if(e.key==="Enter")$("loadYoutube").click()});
+$("youtubeSearch").onclick=()=>searchYouTubeCompatible($("onlineQuery").value);$("onlineQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("youtubeSearch").click()});
+$("loadYoutube").onclick=()=>{const raw=$("youtubeUrl").value.trim();const id=youtubeVideoId(raw);if(!id){$("onlineStatus").textContent="Lien YouTube non reconnu.";return}youtubeEmbed(id);$("onlineStatus").textContent="Lien chargé. Si le propriétaire interdit l’intégration, YouTube affichera son message dans le lecteur."};$("youtubeUrl").addEventListener("keydown",e=>{if(e.key==="Enter")$("loadYoutube").click()});
 async function searchOnlineLyrics(){
   const title=$("lyricsQuery").value.trim(), artist=$("lyricsArtist")?.value.trim()||"", out=$("lyricsResults");
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
