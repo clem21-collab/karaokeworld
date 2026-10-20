@@ -1,6 +1,27 @@
 const $=id=>document.getElementById(id);
 const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
+
+const APP_VERSION="0.19";
+let waitingWorker=null, updateReloading=false;
+function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
+async function setupAppUpdates(){
+  try{
+    const reg=await navigator.serviceWorker.register("./sw.js",{updateViaCache:"none"});
+    if(reg.waiting&&navigator.serviceWorker.controller)showUpdate(reg.waiting);
+    reg.addEventListener("updatefound",()=>{
+      const worker=reg.installing;if(!worker)return;
+      worker.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller)showUpdate(worker)});
+    });
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{if(updateReloading)return;updateReloading=true;location.reload()});
+    setInterval(()=>reg.update().catch(()=>{}),30*60*1000);
+    window.addEventListener("focus",()=>reg.update().catch(()=>{}));
+  }catch(e){console.warn("Mise à jour KaraokeWorld indisponible",e)}
+}
+document.addEventListener("click",e=>{
+  if(e.target?.id==="updateNow"&&waitingWorker){e.target.disabled=true;e.target.textContent="Mise à jour…";waitingWorker.postMessage({type:"SKIP_WAITING"})}
+  if(e.target?.id==="updateLater")$("updateToast")?.classList.add("hidden");
+});
 const demo=[
 ["Dernière danse","Indila","Variété française","🌙"],["Believer","Imagine Dragons","Rock","⚡"],["Someone Like You","Adele","Pop","💜"],["Shape of You","Ed Sheeran","Pop","🎸"],["J'irai où tu iras","Céline Dion","Variété française","🌟"],["Bohemian Rhapsody","Queen","Rock","👑"],["Alors on danse","Stromae","Rap","🎧"],["Fly Me to the Moon","Frank Sinatra","Jazz","🌃"]
 ].map((x,i)=>({id:"demo"+i,title:x[0],artist:x[1],genre:x[2],emoji:x[3],kind:"demo",url:"",created:i}));
@@ -52,7 +73,7 @@ function renderStageLyrics(idx,sec=0){
 function playTrack(id){const t=tracks.find(x=>x.id===id);if(!t)return;currentId=id;lrc=t.lrc||[];$("state").textContent=t.kind==="demo"?"Démo sans audio":"Fichier local";$("audio").pause();$("video").pause();$("audio").classList.add("hidden");$("video").classList.add("hidden");if(t.kind==="demo"||t.kind==="missing"){renderLyrics(0);$("state").textContent=t.kind==="demo"?"Démo : importez l'audio":"Fichier à réimporter";return}const media=t.type==="video"?$("video") :$("audio");media.classList.remove("hidden");media.src=t.url;media.play().catch(()=>{});renderLyrics(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"})}
 function step(dir){const list=queueIds.length?queueIds:visible().map(t=>t.id);if(!list.length)return;let i=list.indexOf(currentId);playTrack(list[(i+dir+list.length)%list.length])}
 async function importFiles(files){for(const f of files){if(f.name.toLowerCase().endsWith(".lrc")||f.name.toLowerCase().endsWith(".txt")){if(currentId){const txt=await f.text(),parsed=[];for(const line of txt.split(/\r?\n/)){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,2})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}const t=tracks.find(x=>x.id===currentId);if(t){t.lrc=parsed;await saveTrack(t);lrc=parsed;renderLyrics(0)}}continue}if(!f.type.startsWith("audio/")&&!f.type.startsWith("video/"))continue;const id="local_"+crypto.randomUUID();const t={id,title:f.name.replace(/\.[^.]+$/,""),artist:"Fichier local",genre:"Sans genre",emoji:f.type.startsWith("video/")?"🎬":"🎶",kind:"local",type:f.type.startsWith("video/")?"video":"audio",blob:f,created:Date.now(),lrc:[]};try{await saveTrack(t);tracks.unshift({...t,url:URL.createObjectURL(f)});const p=currentPlaylist();if(p)p.trackIds.push(id)}catch(e){alert("Stockage impossible : "+e.message)}}syncQueue();drawTracks();drawPlaylists();$("backupStatus").textContent="Importation terminée : fichiers ajoutés à la bibliothèque et à la playlist sélectionnée."}
-async function boot(){try{db=await openDB();const stored=await getAll();tracks=[...demo,...stored.map(t=>({...t,url:t.blob?URL.createObjectURL(t.blob):""}))];}catch(e){tracks=[...demo];$("backupStatus").textContent="Stockage local indisponible : "+e.message}try{playlists=JSON.parse(localStorage.getItem("kw_playlists")||"null")||[];favorites=JSON.parse(localStorage.getItem("kw_favorites")||"[]");}catch(e){playlists=[];favorites=[]}if(!playlists.length){const old=JSON.parse(localStorage.getItem("kw_queue")||"[]");playlists=[{id:"default",name:"Ma playlist",trackIds:old.filter(id=>tracks.some(t=>t.id===id))}]}playlists=playlists.map(p=>({...p,trackIds:(p.trackIds||[]).filter(id=>tracks.some(t=>t.id===id))}));currentPlaylistId=localStorage.getItem("kw_current_playlist")||playlists[0].id;if(!playlists.some(p=>p.id===currentPlaylistId))currentPlaylistId=playlists[0].id;syncQueue();drawTracks();drawPlaylists();if("serviceWorker"in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./sw.js").catch(()=>{})}
+async function boot(){try{db=await openDB();const stored=await getAll();tracks=[...demo,...stored.map(t=>({...t,url:t.blob?URL.createObjectURL(t.blob):""}))];}catch(e){tracks=[...demo];$("backupStatus").textContent="Stockage local indisponible : "+e.message}try{playlists=JSON.parse(localStorage.getItem("kw_playlists")||"null")||[];favorites=JSON.parse(localStorage.getItem("kw_favorites")||"[]");}catch(e){playlists=[];favorites=[]}if(!playlists.length){const old=JSON.parse(localStorage.getItem("kw_queue")||"[]");playlists=[{id:"default",name:"Ma playlist",trackIds:old.filter(id=>tracks.some(t=>t.id===id))}]}playlists=playlists.map(p=>({...p,trackIds:(p.trackIds||[]).filter(id=>tracks.some(t=>t.id===id))}));currentPlaylistId=localStorage.getItem("kw_current_playlist")||playlists[0].id;if(!playlists.some(p=>p.id===currentPlaylistId))currentPlaylistId=playlists[0].id;syncQueue();drawTracks();drawPlaylists();if("serviceWorker"in navigator&&location.protocol!=="file:")setupAppUpdates()}
 $("import").onclick=()=>$ ("files").click();$("files").onchange=e=>{importFiles(e.target.files);e.target.value=""};$("query").oninput=drawTracks;$("sort").onchange=drawTracks;$("favoritesOnly").onchange=drawTracks;
 document.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{activeGenre=b.dataset.g;document.querySelectorAll("[data-g]").forEach(x=>x.classList.toggle("active",x===b));drawTracks()});
 $("playlistSelect").onchange=()=>{currentPlaylistId=$("playlistSelect").value;syncQueue();drawPlaylists()};$("newPlaylist").onclick=createPlaylist;$("renamePlaylist").onclick=renamePlaylist;$("deletePlaylist").onclick=deletePlaylist;
