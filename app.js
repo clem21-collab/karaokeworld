@@ -24,7 +24,8 @@ function createPlaylist(){const name=prompt("Nom de la nouvelle playlist :","Ma 
 function renamePlaylist(){const p=currentPlaylist();if(!p)return;const name=prompt("Nouveau nom de la playlist :",p.name);if(!name||!name.trim())return;p.name=name.trim().slice(0,60);syncQueue();drawPlaylists()}
 function deletePlaylist(){if(playlists.length<=1)return;const p=currentPlaylist();if(!p||!confirm(`Supprimer la playlist « ${p.name} » ? Les fichiers de la bibliothèque ne seront pas supprimés.`))return;playlists=playlists.filter(x=>x.id!==p.id);currentPlaylistId=playlists[0].id;syncQueue();drawPlaylists()}
 function fmt(s){return Number.isFinite(s)?Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0"):"0:00"}
-function renderLyrics(sec=0){if(!lrc.length){$("lyrics").innerHTML=`<div class="artist">${currentId?esc(tracks.find(t=>t.id===currentId)?.title||""):"Sélectionnez un fichier audio ou vidéo."}</div><div class="highlight">${currentId?"Paroles non chargées":"La scène est à vous ✨"}</div><div class="artist">Chargez un fichier .LRC pour les paroles synchronisées.</div>`;return}let idx=-1;lrc.forEach((x,i)=>{if(x.time<=sec)idx=i});$("lyrics").innerHTML=lrc.map((x,i)=>`<div class="${i===idx?'highlight':''}">${esc(x.text)}</div>`).join("")}
+function renderLyrics(sec=0){let idx=-1;if(!lrc.length){$("lyrics").innerHTML=`<div class="artist">${currentId?esc(tracks.find(t=>t.id===currentId)?.title||""):"Sélectionnez un fichier audio ou vidéo."}</div><div class="highlight">${currentId?"Paroles non chargées":"La scène est à vous ✨"}</div><div class="artist">Chargez un fichier .LRC pour les paroles synchronisées.</div>`;renderStageLyrics(-1);return}lrc.forEach((x,i)=>{if(x.time<=sec)idx=i});$("lyrics").innerHTML=lrc.map((x,i)=>`<div class="${i===idx?'highlight':''}">${esc(x.text)}</div>`).join("");renderStageLyrics(idx)}
+function renderStageLyrics(idx){const box=$("stageLyrics");if(!box)return;if(!lrc.length){box.innerHTML='<div class="stage-empty">Les paroles synchronisées apparaîtront ici 🎤</div>';return}box.innerHTML=lrc.map((x,i)=>`<div class="stage-line ${i===idx?'active':Math.abs(i-idx)<=2?'near':''}" data-stage-line="${i}">${esc(x.text||'♪')}</div>`).join('');if(idx>=0){const el=box.querySelector(`[data-stage-line="${idx}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})}}
 function playTrack(id){const t=tracks.find(x=>x.id===id);if(!t)return;currentId=id;lrc=t.lrc||[];$("state").textContent=t.kind==="demo"?"Démo sans audio":"Fichier local";$("audio").pause();$("video").pause();$("audio").classList.add("hidden");$("video").classList.add("hidden");if(t.kind==="demo"||t.kind==="missing"){renderLyrics(0);$("state").textContent=t.kind==="demo"?"Démo : importez l'audio":"Fichier à réimporter";return}const media=t.type==="video"?$("video") :$("audio");media.classList.remove("hidden");media.src=t.url;media.play().catch(()=>{});renderLyrics(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"})}
 function step(dir){const list=queueIds.length?queueIds:visible().map(t=>t.id);if(!list.length)return;let i=list.indexOf(currentId);playTrack(list[(i+dir+list.length)%list.length])}
 async function importFiles(files){for(const f of files){if(f.name.toLowerCase().endsWith(".lrc")||f.name.toLowerCase().endsWith(".txt")){if(currentId){const txt=await f.text(),parsed=[];for(const line of txt.split(/\r?\n/)){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,2})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}const t=tracks.find(x=>x.id===currentId);if(t){t.lrc=parsed;await saveTrack(t);lrc=parsed;renderLyrics(0)}}continue}if(!f.type.startsWith("audio/")&&!f.type.startsWith("video/"))continue;const id="local_"+crypto.randomUUID();const t={id,title:f.name.replace(/\.[^.]+$/,""),artist:"Fichier local",genre:"Sans genre",emoji:f.type.startsWith("video/")?"🎬":"🎶",kind:"local",type:f.type.startsWith("video/")?"video":"audio",blob:f,created:Date.now(),lrc:[]};try{await saveTrack(t);tracks.unshift({...t,url:URL.createObjectURL(f)});const p=currentPlaylist();if(p)p.trackIds.push(id)}catch(e){alert("Stockage impossible : "+e.message)}}syncQueue();drawTracks();drawPlaylists();$("backupStatus").textContent="Importation terminée : fichiers ajoutés à la bibliothèque et à la playlist sélectionnée."}
@@ -98,7 +99,7 @@ async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDur
   $('lyricsQuery').value=title;$('lyricsArtist').value=artist;
   $('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.12"}, urls=[];
+    const headers={"Lrclib-Client":"KaraokeWorld v0.14"}, urls=[];
     if(title&&artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     if(title) urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
     if(title) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title));
@@ -162,7 +163,7 @@ async function searchOnlineLyrics(){
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.12"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.14"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
@@ -203,5 +204,14 @@ async function searchOnlineLyrics(){
   }catch(e){out.innerHTML=`<p class="empty">${esc(e.message||"Erreur pendant la recherche.")}</p>`}
 }
 $("searchLyrics").onclick=searchOnlineLyrics;$("lyricsQuery").addEventListener("keydown",e=>{if(e.key==="Enter")searchOnlineLyrics()});$("lyricsArtist")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchOnlineLyrics()});
+
+let youtubeHome=null;
+function updateStageOffset(){if($("stageOffset"))$("stageOffset").textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'}
+async function enterKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(!stage)return;if(yp&&!yp.classList.contains('hidden')){youtubeHome={parent:yp.parentNode,next:yp.nextSibling};$("stageVideoSlot").appendChild(yp)}stage.classList.remove('hidden');stage.setAttribute('aria-hidden','false');renderStageLyrics(-1);updateStageOffset();try{if(stage.requestFullscreen)await stage.requestFullscreen()}catch(e){}}
+function exitKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}stage.classList.add('hidden');stage.setAttribute('aria-hidden','true');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
+$("fullscreenKaraoke").onclick=enterKaraokeStage;$("exitFullscreen").onclick=exitKaraokeStage;
+$("stagePlay").onclick=()=>$("play").click();$("stagePause").onclick=()=>$("pause").click();$("stageStop").onclick=()=>$("stop").click();
+$("stageMinus").onclick=()=>{$("offsetMinus").click();updateStageOffset()};$("stagePlus").onclick=()=>{$("offsetPlus").click();updateStageOffset()};
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&!$("karaokeStage").classList.contains('hidden')){const yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}$("karaokeStage").classList.add('hidden');$("karaokeStage").setAttribute('aria-hidden','true')}});
 
 boot();
