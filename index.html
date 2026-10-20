@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#091426"><meta name="description" content="KaraokeWorld : karaoké local et en ligne, playlists sauvegardées et test micro.">
 <link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./style.css">
-<title>KaraokeWorld v0.14</title>
+<title>KaraokeWorld v0.15</title>
 </head>
 <body>
 <header><div class="brand">🎤 Karaoke<span>World</span><small> BETA</small></div><div class="top-actions"><button id="install" class="secondary hidden">Installer l’application</button><button id="import">＋ Importer</button><input id="files" type="file" accept="audio/*,video/*,.lrc,.txt" multiple hidden></div></header>
@@ -19,4 +19,21 @@
 <div class="panel" id="queue-panel"><div class="row-head"><h2>☷ Ma playlist</h2><button id="clear" class="secondary">Vider</button></div><div class="playlist-tools"><label for="playlistSelect">Playlist sélectionnée</label><select id="playlistSelect" aria-label="Playlist sélectionnée"></select><div class="controls wrap"><button id="newPlaylist" class="secondary">＋ Nouvelle playlist</button><button id="renamePlaylist" class="secondary">Renommer</button><button id="deletePlaylist" class="danger">Supprimer</button></div></div><div id="queue" class="queue"><p class="empty">Ajoutez des morceaux avec « + Playlist ».</p></div><hr><div class="row-head"><h2>🎙 Test du micro</h2><span id="micState" class="status">Désactivé</span></div><select id="device" aria-label="Microphone"><option value="">Micro par défaut</option></select><div class="meter"><span id="meter"></span></div><div class="controls"><button id="micOn">Activer le micro</button><button id="micOff" class="secondary" disabled>Couper</button></div><p class="muted">Le niveau sonore est mesuré localement. Le son du micro n’est pas renvoyé dans les enceintes pour éviter le Larsen. Le mixage micro + musique sera ajouté dans une prochaine étape.</p></div></section>
 <section id="settings" class="panel hidden"><h2>Paramètres et données</h2><p>Les playlists et les métadonnées sont sauvegardées sur cet appareil. Les fichiers audio restent dans leur emplacement d’origine : réimportez-les si le navigateur ne les retrouve plus.</p><div class="controls wrap"><button id="export">Exporter une sauvegarde JSON</button><button id="importBackup" class="secondary">Importer une sauvegarde JSON</button><input id="backupFile" type="file" accept=".json,application/json" hidden><button id="forget" class="danger">Effacer la bibliothèque enregistrée</button></div><p id="backupStatus" class="muted"></p></section>
 <footer>KaraokeWorld Beta · Gratuit · Respectez les droits d’auteur et les conditions des services vidéo.</footer></main></div>
-<div id="karaokeStage" class="karaoke-stage hidden" aria-hidden="true"><div class="stage-lyrics-wrap"><div id="stageLyrics" class="stage-lyrics"><div class="stage-empty">Les paroles apparaîtront ici.</div></div></div><div class="stage-video"><div id="stageVideoSlot"></div><div class="stage-controls"><button id="stagePlay">▶</button><button id="stagePause" class="secondary">⏸</button><button id="stageStop" class="secondary">■</button><button id="stageMinus" class="secondary">Paroles −0,5 s</button><span id="stageOffset" class="status">0.0 s</span><button id="stagePlus" class="secondary">Paroles +0,5 s</button><button id="exitFullscreen" class="secondary">✕ Quitter</button></div></div></div><script src="./app.js"></script></body></html>
+<div id="karaokeStage" class="karaoke-stage hidden" aria-hidden="true">
+<div class="stage-bg" id="stageBg"></div>
+<div class="stage-lyrics-wrap">
+  <div class="stage-song-info" id="stageSongInfo"><b id="stageSongTitle">KaraokeWorld</b><span id="stageSongArtist">Prêt à chanter 🎤</span></div>
+  <div id="stageCountdown" class="stage-countdown hidden"></div>
+  <div id="stageLyrics" class="stage-lyrics"><div class="stage-empty">Les paroles apparaîtront ici.</div></div>
+  <div class="stage-hint">Espace Lecture/Pause · ← → ±5 s · F Plein écran · Échap Quitter</div>
+</div>
+<div class="stage-video">
+  <div id="stageVideoSlot"></div>
+  <div class="stage-mic"><span id="stageMicDot"></span><span id="stageMicText">Micro désactivé</span><div class="stage-mic-meter"><i id="stageMicLevel"></i></div></div>
+  <div class="stage-progress"><span id="stageElapsed">0:00</span><input id="stageSeek" type="range" min="0" max="100" value="0"><span id="stageDuration">0:00</span></div>
+  <div class="stage-controls"><button id="stagePlay">▶ Lecture</button><button id="stagePause" class="secondary">⏸ Pause</button><button id="stageStop" class="secondary">■ Stop</button></div>
+  <div class="stage-controls"><button id="stageMinus" class="secondary">−0,5 s</button><span id="stageOffset" class="status">Synchro 0.0 s</span><button id="stagePlus" class="secondary">+0,5 s</button><button id="stageReset" class="secondary">↺</button></div>
+  <div class="stage-controls"><button class="stage-layout secondary active" data-layout="72">72/28</button><button class="stage-layout secondary" data-layout="80">80/20</button><button class="stage-layout secondary" data-layout="100">Paroles seules</button></div>
+  <label class="stage-option"><input id="stageCountdownEnabled" type="checkbox" checked> Compte à rebours 3-2-1</label>
+  <button id="exitFullscreen" class="secondary">✕ Quitter le mode karaoké</button>
+</div></div><script src="./app.js"></script></body></html>
