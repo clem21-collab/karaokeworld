@@ -166,7 +166,7 @@ async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDur
   $('lyricsQuery').value=title;$('lyricsArtist').value=artist;
   $('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20.1"}, urls=[];
+    const headers={"Lrclib-Client":"KaraokeWorld v0.20.2"}, urls=[];
     if(title&&artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     if(title) urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
     if(title) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title));
@@ -207,6 +207,29 @@ async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDur
   }catch(e){$('state').textContent="Vidéo YouTube · paroles non chargées";$('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`}
 }
 
+
+const VIDEO_QUALITY_KEY="kw_video_quality_v1";
+function getVideoQualityMode(){return localStorage.getItem(VIDEO_QUALITY_KEY)||"auto"}
+function applyVideoQuality(){
+  if(!ytPlayer||!ytPlayer.setPlaybackQuality)return;
+  const mode=getVideoQualityMode();
+  try{
+    if(mode==="data")ytPlayer.setPlaybackQuality("small");
+    else if(mode==="high")ytPlayer.setPlaybackQuality("hd720");
+    else ytPlayer.setPlaybackQuality("default");
+  }catch(e){}
+}
+function cycleVideoQuality(){
+  const modes=["auto","data","high"],cur=getVideoQualityMode();
+  const next=modes[(modes.indexOf(cur)+1)%modes.length];
+  localStorage.setItem(VIDEO_QUALITY_KEY,next);applyVideoQuality();updateVideoQualityButton();
+}
+function updateVideoQualityButton(){
+  const b=document.getElementById("videoQualityMode");if(!b)return;
+  const m=getVideoQualityMode();
+  b.textContent=m==="data"?"📶 Économie 240p/360p":m==="high"?"📺 Haute qualité":"📶 Qualité automatique";
+}
+
 const AUTO_SYNC_KEY="kw_auto_sync_v1";
 function autoSyncMap(){try{return JSON.parse(localStorage.getItem(AUTO_SYNC_KEY)||"{}")||{}}catch(e){return {}}}
 function syncKey(){return currentYoutubeId?("yt:"+currentYoutubeId):""}
@@ -214,26 +237,34 @@ function setOffset(v,label="Synchro"){lyricOffset=Math.max(-20,Math.min(20,Math.
 function saveVideoOffset(){const k=syncKey();if(!k)return;const m=autoSyncMap();m[k]=lyricOffset;localStorage.setItem(AUTO_SYNC_KEY,JSON.stringify(m))}
 function applyAutoSync(hit){
   const k=syncKey(),m=autoSyncMap();
-  if(k&&Number.isFinite(Number(m[k]))){setOffset(Number(m[k]),"YouTube + paroles · synchro mémorisée");return "mémorisée"}
-  let vd=0;try{vd=ytPlayer&&ytPlayer.getDuration?Number(ytPlayer.getDuration()||0):0}catch(e){}
-  const ld=Number(hit?.duration||0);
-  // Estimation volontairement prudente : pour un petit surplus de durée vidéo,
-  // on attribue une partie du surplus à l'intro du clip. Les gros écarts ne sont pas corrigés automatiquement.
-  let estimated=0;
-  if(vd>0&&ld>0){
-    const extra=vd-ld;
-    if(extra>=1.5&&extra<=12) estimated=Math.min(6,extra*.55);
-    else if(extra<=-1.5&&extra>=-6) estimated=Math.max(-3,extra*.35);
+  if(k&&Number.isFinite(Number(m[k]))){
+    setOffset(Number(m[k]),"YouTube + paroles · Auto Sync ✓ (mémorisé)");
+    return "mémorisée";
   }
-  setOffset(estimated,estimated?"YouTube + paroles · Auto Sync appliqué":"YouTube + paroles synchronisées");
-  return estimated?"automatique":"neutre"
+  let vd=0;
+  try{vd=ytPlayer&&ytPlayer.getDuration?Number(ytPlayer.getDuration()||0):0}catch(e){}
+  const ld=Number(hit?.duration||0);
+  let estimated=0, confidence="incertaine";
+  if(vd>0&&ld>0){
+    const gap=vd-ld;
+    // Auto Sync 2.0 est volontairement conservateur.
+    // Un petit écart peut correspondre à une intro/outro différente.
+    if(gap>=1.0&&gap<=5.0){estimated=Math.min(2.5,gap*.45);confidence="moyenne"}
+    else if(gap<=-1.0&&gap>=-3.0){estimated=Math.max(-1.2,gap*.30);confidence="moyenne"}
+  }
+  if(confidence==="moyenne"){
+    setOffset(estimated,"YouTube + paroles · Auto Sync ✓");
+    return "automatique";
+  }
+  setOffset(0,"YouTube + paroles · Synchronisation incertaine");
+  return "incertaine";
 }
 
 function useAutoLyrics(hit,automatic=false){
   const parsed=parseLrc(hit.syncedLyrics);if(!parsed.length)return;
   lrc=parsed;$('lyricsQuery').value=hit.trackName||$('lyricsQuery').value;$('lyricsArtist').value=hit.artistName||$('lyricsArtist').value;
   const syncMode=applyAutoSync(hit);
-  $('state').textContent=syncMode==='mémorisée'?"YouTube + paroles · synchro mémorisée":(syncMode==='automatique'?"YouTube + paroles · Auto Sync":"YouTube + paroles synchronisées");
+  $('state').textContent=syncMode==='mémorisée'?"YouTube + paroles · synchro mémorisée":(syncMode==='automatique'?"YouTube + paroles · Auto Sync ✓":(syncMode==='incertaine'?"YouTube + paroles · Synchronisation incertaine":"YouTube + paroles synchronisées"));
   $('lyricsResults').innerHTML=`<article class="lyric-result"><h3>${esc(hit.trackName||"")}</h3><p>${esc(hit.artistName||"")} · ✓ ${automatic?"trouvé et chargé automatiquement":"paroles chargées"}</p></article>`;
   renderLyrics(0);$('player').scrollIntoView({behavior:"smooth",block:"nearest"});
 }
@@ -257,7 +288,7 @@ async function searchOnlineLyrics(){
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20.1"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.20.2"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
@@ -335,3 +366,6 @@ async function loadCloudAndMerge(){if(!cloudUser||!cloudApi)return;try{$('cloudS
 function updateCloudUI(user){cloudUser=user||null;$('cloudSignedOut')?.classList.toggle('hidden',!!user);$('cloudSignedIn')?.classList.toggle('hidden',!user);if(user){$('cloudUserName').textContent=user.displayName||'Compte Google';$('cloudUserEmail').textContent=user.email||''}else $('cloudStatus').textContent='Synchronisation désactivée tant que tu n’es pas connecté.'}
 async function initCloud(){try{const [{initializeApp},{getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js')]);const app=initializeApp(FIREBASE_CONFIG),auth=getAuth(app),fs=getFirestore(app);cloudApi={auth,fs,GoogleAuthProvider,signInWithPopup,signOut,doc,getDoc,setDoc};$('googleSignIn').onclick=async()=>{try{$('cloudStatus').textContent='Connexion Google…';await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){$('cloudStatus').textContent='Connexion impossible : '+e.message}};$('googleSignOut').onclick=()=>signOut(auth);$('syncNow').onclick=()=>saveCloud(true);onAuthStateChanged(auth,async user=>{updateCloudUI(user);if(user)await loadCloudAndMerge()})}catch(e){$('cloudStatus').textContent='Service cloud indisponible : '+e.message}}
 if(location.protocol!=='file:')initCloud();
+
+// v0.20.2 quality selector
+window.addEventListener("DOMContentLoaded",()=>{const b=document.getElementById("videoQualityMode");if(b){updateVideoQualityButton();b.addEventListener("click",cycleVideoQuality)}});

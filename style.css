@@ -44,7 +44,7 @@ input,select{background:#120a1b;border-color:#60367a}.hero{border-color:#a94bda;
 footer:after{content:" · 🎃 Halloween Edition";color:#ff9b32}
 @media(max-width:520px){body:before{display:none}.hero:after{font-size:34px}}
 
-/* v0.20.1 — Halloween Edition immersive */
+/* v0.20.2 — Halloween Edition immersive */
 :root{--h-orange:#ff6a00;--h-orange2:#ff9a24;--h-violet:#a52cff;--h-pink:#e13dce;--h-deep:#09020d}
 body{background:radial-gradient(circle at 50% -10%,#5b166f 0,transparent 31%),radial-gradient(circle at 90% 35%,#321040 0,transparent 30%),radial-gradient(circle at 8% 65%,#35100f 0,transparent 28%),linear-gradient(180deg,#09020d 0%,#12051a 52%,#07020b 100%);background-attachment:fixed}
 body:before{content:"🦇        🦇            🕸️";z-index:0;top:90px;right:2vw;left:230px;text-align:right;font-size:clamp(24px,3vw,48px);opacity:.42;filter:drop-shadow(0 0 10px #a52cff);animation:hFloat 6s ease-in-out infinite}
@@ -59,7 +59,7 @@ main{position:relative}.home-hero{min-height:510px;padding:72px 32px 58px;border
 @media(max-width:520px){.brand:before{content:"🎃 ";}.home-hero{min-height:auto;padding:46px 18px 80px}.home-hero:before{font-size:90px}.home-hero:after{font-size:30px}.home-hero>p{font-size:14px}}
 
 
-/* === KaraokeWorld v0.20.1 Halloween polish === */
+/* === KaraokeWorld v0.20.2 Halloween polish === */
 body{
  background:
  radial-gradient(circle at 78% 18%,rgba(181,44,255,.14),transparent 28rem),
