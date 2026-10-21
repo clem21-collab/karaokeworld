@@ -44,7 +44,7 @@ input,select{background:#120a1b;border-color:#60367a}.hero{border-color:#a94bda;
 footer:after{content:" · 🎃 Halloween Edition";color:#ff9b32}
 @media(max-width:520px){body:before{display:none}.hero:after{font-size:34px}}
 
-/* v0.19.6 — Halloween Edition immersive */
+/* v0.19.7 — Halloween Edition immersive */
 :root{--h-orange:#ff6a00;--h-orange2:#ff9a24;--h-violet:#a52cff;--h-pink:#e13dce;--h-deep:#09020d}
 body{background:radial-gradient(circle at 50% -10%,#5b166f 0,transparent 31%),radial-gradient(circle at 90% 35%,#321040 0,transparent 30%),radial-gradient(circle at 8% 65%,#35100f 0,transparent 28%),linear-gradient(180deg,#09020d 0%,#12051a 52%,#07020b 100%);background-attachment:fixed}
 body:before{content:"🦇        🦇            🕸️";z-index:0;top:90px;right:2vw;left:230px;text-align:right;font-size:clamp(24px,3vw,48px);opacity:.42;filter:drop-shadow(0 0 10px #a52cff);animation:hFloat 6s ease-in-out infinite}
@@ -57,3 +57,28 @@ main{position:relative}.home-hero{min-height:510px;padding:72px 32px 58px;border
 @keyframes hFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(9px)}}
 @media(max-width:900px){body:before{left:0}.home-hero{min-height:470px}}
 @media(max-width:520px){.brand:before{content:"🎃 ";}.home-hero{min-height:auto;padding:46px 18px 80px}.home-hero:before{font-size:90px}.home-hero:after{font-size:30px}.home-hero>p{font-size:14px}}
+
+
+/* === KaraokeWorld v0.19.7 Halloween polish === */
+body{
+ background:
+ radial-gradient(circle at 78% 18%,rgba(181,44,255,.14),transparent 28rem),
+ radial-gradient(circle at 38% 70%,rgba(255,116,23,.07),transparent 30rem),
+ linear-gradient(135deg,#07020c 0%,#100218 50%,#050108 100%)!important;
+}
+.hero,.home-hero{position:relative;isolation:isolate;overflow:hidden;
+ box-shadow:0 0 0 1px rgba(255,116,23,.10),0 0 38px rgba(181,44,255,.16),inset 0 0 80px rgba(181,44,255,.08)}
+.hero::before,.home-hero::before{content:"🦇　　　　　　　　　🦇";position:absolute;top:20px;left:7%;right:7%;
+ display:flex;justify-content:space-between;font-size:30px;opacity:.62;pointer-events:none;z-index:-1;
+ filter:drop-shadow(0 0 8px rgba(181,44,255,.8));animation:kwBat 5s ease-in-out infinite}
+.hero::after,.home-hero::after{content:"🎃";position:absolute;left:28px;bottom:20px;font-size:54px;opacity:.62;
+ pointer-events:none;z-index:-1;filter:drop-shadow(0 0 14px rgba(255,116,23,.55));animation:kwPumpkin 3.4s ease-in-out infinite}
+main::after{content:"👻";position:fixed;right:30px;bottom:32px;font-size:46px;opacity:.15;pointer-events:none;
+ filter:drop-shadow(0 0 12px rgba(181,44,255,.8));animation:kwGhost 6s ease-in-out infinite;z-index:0}
+button,.btn{transition:transform .18s ease,box-shadow .18s ease}
+button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,44,255,.22)}
+@keyframes kwBat{50%{transform:translateY(8px) scale(1.04)}}
+@keyframes kwPumpkin{50%{filter:drop-shadow(0 0 22px rgba(255,116,23,.85));transform:scale(1.04)}}
+@keyframes kwGhost{50%{transform:translate(-8px,-16px) rotate(-4deg);opacity:.24}}
+@media(prefers-reduced-motion:reduce){.hero::before,.home-hero::before,.hero::after,.home-hero::after,main::after{animation:none!important}}
+@media(max-width:760px){.hero::before,.home-hero::before{font-size:21px}.hero::after,.home-hero::after{font-size:36px;opacity:.38}main::after{font-size:32px}}
