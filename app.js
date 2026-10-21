@@ -156,57 +156,76 @@ function prepareLyricsForYouTube(query,videoTitle="",channelTitle=""){
   $('lyricsResults').innerHTML='<p class="empty">KaraokeWorld identifie automatiquement le morceau et cherche les meilleures paroles LRCLIB…</p>';
 }
 async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDuration=0){
-  const q=(query||"").trim();
-  const guessed=guessTitleArtist(q,videoTitle,channelTitle);
+  const q=(query||"").trim(), guessed=guessTitleArtist(q,videoTitle,channelTitle);
   const title=guessed.title||cleanYoutubeTitle(videoTitle)||q;
   let artist=guessed.artist||"";
-  // Une chaîne officielle/VEVO/Topic donne un indice artiste supplémentaire.
   const channelArtist=cleanYoutubeTitle(channelTitle).replace(/\b(vevo|topic|official|officiel|music)\b/ig," ").replace(/\s+/g," ").trim();
-  if(!artist && channelArtist) artist=channelArtist;
+  if(!artist&&channelArtist)artist=channelArtist;
   $('lyricsQuery').value=title;$('lyricsArtist').value=artist;
-  $('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";
+  $('lyricsResults').innerHTML='<p class="empty">Recherche de la version exacte des paroles synchronisées…</p>';
+  $('state').textContent="Paroles · recherche de la bonne version…";
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20.2"}, urls=[];
-    if(title&&artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
-    if(title) urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
-    if(title) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title));
+    const headers={"Lrclib-Client":"KaraokeWorld v0.21.0"},urls=[];
+    if(title&&artist)urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
+    urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([artist,title].filter(Boolean).join(" ")));
+    if(title)urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title));
     let all=[];
     for(const url of urls){
       const res=await fetch(url,{headers});
       if(res.status===429)throw new Error("Trop de recherches LRCLIB. Réessaie dans quelques instants.");
       if(!res.ok)continue;
-      const found=await res.json();if(Array.isArray(found))all.push(...found);
+      const a=await res.json();if(Array.isArray(a))all.push(...a);
     }
-    const seen=new Set();
-    const items=all.filter(x=>{const k=x.id??[x.trackName,x.artistName,x.albumName,x.duration].join("|");if(seen.has(k))return false;seen.add(k);return !!x.syncedLyrics});
-    const nt=normMatch(title),na=normMatch(artist),nq=normMatch(q),nv=normMatch(cleanYoutubeTitle(videoTitle));
-    const tokens=v=>new Set(normMatch(v).split(/\s+/).filter(w=>w.length>1));
-    const similarity=(a,b)=>{const A=tokens(a),B=tokens(b);if(!A.size||!B.size)return 0;let common=0;A.forEach(x=>{if(B.has(x))common++});return common/Math.max(A.size,B.size)};
+    const seen=new Set(),items=all.filter(x=>{
+      const k=x.id??[x.trackName,x.artistName,x.albumName,x.duration].join("|");
+      if(seen.has(k))return false;seen.add(k);return !!x.syncedLyrics;
+    });
+    const norm=v=>normMatch(v),tokens=v=>new Set(norm(v).split(/\s+/).filter(w=>w.length>1));
+    const sim=(a,b)=>{const A=tokens(a),B=tokens(b);if(!A.size||!B.size)return 0;let c=0;A.forEach(x=>B.has(x)&&c++);return c/Math.max(A.size,B.size)};
+    const nt=norm(title),na=norm(artist),nv=norm(cleanYoutubeTitle(videoTitle)),nq=norm(q);
+    const versionWords=v=>new Set((norm(v).match(/\b(live|remaster|remastered|acoustic|acoustique|instrumental|karaoke|radio|edit|version|mix|extended|concert)\b/g)||[]));
+    const wantedVersions=versionWords(videoTitle+" "+q);
     const score=x=>{
-      const tt=normMatch(x.trackName),aa=normMatch(x.artistName);let s=0;
-      const titleSim=similarity(tt,nt),artistSim=similarity(aa,na);
-      if(tt===nt)s+=52;else if(nt&&(tt.includes(nt)||nt.includes(tt)))s+=32;else s+=Math.round(titleSim*22);
-      if(na){if(aa===na)s+=48;else if(aa.includes(na)||na.includes(aa))s+=32;else if(artistSim>=.6)s+=18;else s-=55}
-      if(nq&&tt&&nq.includes(tt))s+=10;if(nq&&aa&&nq.includes(aa))s+=14;
-      if(nv&&tt&&nv.includes(tt))s+=12;if(nv&&aa&&nv.includes(aa))s+=14;
-      const d=Number(x.duration||0);if(videoDuration>0&&d>0){const diff=Math.abs(videoDuration-d);if(diff<=3)s+=20;else if(diff<=8)s+=14;else if(diff<=15)s+=7;else if(diff>45)s-=18}
+      const tt=norm(x.trackName),aa=norm(x.artistName),meta=norm([x.trackName,x.albumName].join(" "));
+      let s=0,ts=sim(tt,nt),as=sim(aa,na);
+      if(tt===nt)s+=70;else if(nt&&(tt.includes(nt)||nt.includes(tt)))s+=45;else s+=Math.round(ts*30);
+      if(na){
+        if(aa===na)s+=70;
+        else if(aa.includes(na)||na.includes(aa))s+=48;
+        else if(as>=.65)s+=25;
+        else s-=90; // mauvais artiste = quasi éliminé
+      }
+      if(nv&&tt&&nv.includes(tt))s+=15;if(nv&&aa&&nv.includes(aa))s+=18;
+      if(nq&&aa&&nq.includes(aa))s+=12;
+      const candVersions=versionWords(meta);
+      wantedVersions.forEach(w=>{s+=candVersions.has(w)?12:-10});
+      candVersions.forEach(w=>{if(!wantedVersions.has(w))s-=7});
+      const d=Number(x.duration||0);
+      if(videoDuration>0&&d>0){
+        const diff=Math.abs(videoDuration-d);
+        if(diff<=2)s+=38;else if(diff<=5)s+=30;else if(diff<=10)s+=18;else if(diff<=18)s+=6;
+        else if(diff<=30)s-=12;else s-=35;
+      }
       return s;
     };
     items.sort((a,b)=>score(b)-score(a));
-    const hit=items[0],second=items[1],best=hit?score(hit):-999,runner=second?score(second):-999;
-    // On exige une forte cohérence et une marge sur le second résultat pour éviter FOPOSS/Johnny.
-    const good=hit && best>=(artist?68:55) && (best-runner>=10 || best>=100);
-    if(!good){
-      lrc=[];renderLyrics(0);$('state').textContent="Vidéo YouTube · identification incertaine";
-      const choices=items.slice(0,3).map((x,i)=>`<article class="lyric-result"><h3>${esc(x.trackName||"Titre inconnu")}</h3><p>${esc(x.artistName||"Artiste inconnu")}${x.duration?" · "+fmt(Number(x.duration)):""}</p><button data-auto-choice="${i}">Utiliser ces paroles</button></article>`).join("");
-      $('lyricsResults').innerHTML='<p class="empty">Je n’ai pas trouvé une correspondance assez sûre pour charger des paroles automatiquement. Choisis seulement si nécessaire :</p>'+choices;
-      items.slice(0,3).forEach((x,i)=>{const b=document.querySelector(`[data-auto-choice="${i}"]`);if(b)b.onclick=()=>useAutoLyrics(x)});
-      return;
-    }
-    useAutoLyrics(hit,true);
-  }catch(e){$('state').textContent="Vidéo YouTube · paroles non chargées";$('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`}
+    const top=items.slice(0,3),best=top[0]?score(top[0]):-999,runner=top[1]?score(top[1]):-999;
+    // Une sélection automatique exige une identité artiste/titre solide et une marge claire.
+    const first=top[0],artistOK=!na||(first&&sim(first.artistName,artist)>=.65)||(first&&norm(first.artistName)===na);
+    const titleOK=first&&sim(first.trackName,title)>=.65;
+    const durationOK=!videoDuration||!Number(first?.duration)||(Math.abs(videoDuration-Number(first.duration))<=18);
+    const good=first&&artistOK&&titleOK&&durationOK&&best>=(artist?105:80)&&(best-runner>=12||best>=145);
+    if(good){useAutoLyrics(first,true);return}
+    lrc=[];renderLyrics(0);$('state').textContent="Paroles · plusieurs versions possibles";
+    if(!top.length){$('lyricsResults').innerHTML='<p class="empty">Aucune parole synchronisée suffisamment proche trouvée.</p>';return}
+    $('lyricsResults').innerHTML='<p class="empty">KaraokeWorld préfère te proposer les meilleures versions plutôt que charger de mauvaises paroles :</p>'+
+      top.map((x,i)=>`<article class="lyric-result"><h3>${esc(x.trackName||"Titre inconnu")}</h3><p>${esc(x.artistName||"Artiste inconnu")}${x.albumName?" · "+esc(x.albumName):""}${x.duration?" · "+fmt(Number(x.duration)):""}</p><button data-auto-choice="${i}">Utiliser cette version</button></article>`).join("");
+    top.forEach((x,i)=>{const b=document.querySelector(`[data-auto-choice="${i}"]`);if(b)b.onclick=()=>useAutoLyrics(x)});
+  }catch(e){
+    $('state').textContent="Vidéo YouTube · paroles non chargées";
+    $('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`;
+  }
 }
-
 
 const VIDEO_QUALITY_KEY="kw_video_quality_v1";
 function getVideoQualityMode(){return localStorage.getItem(VIDEO_QUALITY_KEY)||"auto"}
@@ -288,7 +307,7 @@ async function searchOnlineLyrics(){
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20.2"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.21.0"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
@@ -367,5 +386,5 @@ function updateCloudUI(user){cloudUser=user||null;$('cloudSignedOut')?.classList
 async function initCloud(){try{const [{initializeApp},{getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js')]);const app=initializeApp(FIREBASE_CONFIG),auth=getAuth(app),fs=getFirestore(app);cloudApi={auth,fs,GoogleAuthProvider,signInWithPopup,signOut,doc,getDoc,setDoc};$('googleSignIn').onclick=async()=>{try{$('cloudStatus').textContent='Connexion Google…';await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){$('cloudStatus').textContent='Connexion impossible : '+e.message}};$('googleSignOut').onclick=()=>signOut(auth);$('syncNow').onclick=()=>saveCloud(true);onAuthStateChanged(auth,async user=>{updateCloudUI(user);if(user)await loadCloudAndMerge()})}catch(e){$('cloudStatus').textContent='Service cloud indisponible : '+e.message}}
 if(location.protocol!=='file:')initCloud();
 
-// v0.20.2 quality selector
+// v0.21.0 quality selector
 window.addEventListener("DOMContentLoaded",()=>{const b=document.getElementById("videoQualityMode");if(b){updateVideoQualityButton();b.addEventListener("click",cycleVideoQuality)}});
