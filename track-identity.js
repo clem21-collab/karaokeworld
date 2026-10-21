@@ -1,4 +1,4 @@
-/* KaraokeWorld — Track Identity Engine v0.2 */
+/* KaraokeWorld — Track Identity Engine v0.3 */
 const KWTrackIdentity=(()=>{
  const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(official|officiel|video|clip|audio|lyrics?|paroles|hd|4k)\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim();
  const VERSION_WORDS=['live','remaster','remastered','acoustic','acoustique','instrumental','karaoke','radio edit','edit','extended','remix','mix','version','concert'];
@@ -7,20 +7,49 @@ const KWTrackIdentity=(()=>{
  function identifyCandidate(q,c){const ts=similarity(q.title,c.title),as=q.artist?similarity(q.artist,c.artist):0.5,w=versionTags(`${q.title||''} ${q.version||''}`),g=versionTags(`${c.title||''} ${c.version||''}`),vm=[...new Set([...w,...g])].some(x=>w.includes(x)!==g.includes(x));let ds=null;if(Number.isFinite(q.duration)&&Number.isFinite(c.duration)){const gap=Math.abs(q.duration-c.duration);ds=Math.max(0,1-gap/12)}let score=ts*50+as*35;if(ds!==null)score+=ds*15;if(vm)score-=25;if(q.isrc&&c.isrc)score+=q.isrc===c.isrc?100:-100;return{...c,match:{score:Math.round(score),confidence:score>=90?'exact':score>=70?'probable':'weak',titleScore:ts,artistScore:as,durationScore:ds,versionMismatch:vm,exactIsrc:Boolean(q.isrc&&c.isrc&&q.isrc===c.isrc)}}}
  const rank=(q,c=[])=>c.map(x=>identifyCandidate(q,x)).sort((a,b)=>b.match.score-a.match.score);
  const recordingKey=t=>t.isrc?`isrc:${String(t.isrc).toUpperCase()}`:['meta',normalize(t.artist),normalize(t.title),Math.round(t.duration||0)].join(':');
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ async function lrclibFetch(url,headers){
+   let last=null;
+   for(let attempt=0;attempt<3;attempt++){
+     try{
+       const res=await fetch(url,{headers});
+       if(res.ok)return res;
+       last=new Error(`LRCLIB ${res.status}`);last.status=res.status;
+       if(res.status===503||res.status===429){const retry=Math.max(1,Number(res.headers.get('Retry-After'))||1);await sleep(retry*1000);continue}
+       return null;
+     }catch(e){last=e;await sleep(700*(attempt+1))}
+   }
+   if(last)throw last;return null;
+ }
  async function searchLrclib(track){
-   const headers={'Lrclib-Client':'KaraokeWorld/track-identity-v0.2'};
+   const headers={'Lrclib-Client':'KaraokeWorld/track-identity-v0.3'};
    const urls=[];
    if(track.title&&track.artist)urls.push(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.title)}&artist_name=${encodeURIComponent(track.artist)}`);
    if(track.title&&track.artist)urls.push(`https://lrclib.net/api/search?q=${encodeURIComponent(track.title+' '+track.artist)}`);
    if(track.title)urls.push(`https://lrclib.net/api/search?q=${encodeURIComponent(track.title)}`);
-   let all=[],lastError=null;
-   for(const url of urls){try{const res=await fetch(url,{headers});if(!res.ok){lastError=new Error(`LRCLIB ${res.status}`);continue}const rows=await res.json();if(Array.isArray(rows))all.push(...rows)}catch(e){lastError=e}}
+   let all=[],unavailable=false;
+   for(const url of urls){
+     try{const res=await lrclibFetch(url,headers);if(!res)continue;const rows=await res.json();if(Array.isArray(rows))all.push(...rows)}
+     catch(e){if(e.status===503||e.status===429){unavailable=true;break}}
+     await sleep(300);
+   }
    const seen=new Set();all=all.filter(x=>{const k=x.id??[x.trackName,x.artistName,x.albumName,x.duration].join('|');if(seen.has(k))return false;seen.add(k);return true});
-   if(!all.length&&lastError)throw lastError;
-   return rank(track,all.map(x=>({provider:'lrclib',providerId:x.id,title:x.trackName,artist:x.artistName,album:x.albumName,duration:Number(x.duration),syncedLyrics:x.syncedLyrics,plainLyrics:x.plainLyrics,hasWordSync:Boolean(x.hasWordSync)})));
+   const ranked=rank(track,all.map(x=>({provider:'lrclib',providerId:x.id,title:x.trackName,artist:x.artistName,album:x.albumName,duration:Number(x.duration),syncedLyrics:x.syncedLyrics,plainLyrics:x.plainLyrics,hasWordSync:Boolean(x.hasWordSync)})));
+   ranked.sourceStatus=unavailable?'temporarily-unavailable':'ok';return ranked;
+ }
+ async function searchFallback(track){
+   /* Provider-independent hook: future licensed/authorized lyric providers plug in here. */
+   return {provider:'fallback',status:'not-configured',results:[],message:'Aucune deuxième source synchronisée n’est encore configurée.'};
+ }
+ async function searchLyricsMultiSource(track){
+   const sources=[];let lr=[];
+   try{lr=await searchLrclib(track);sources.push({provider:'lrclib',status:lr.sourceStatus||'ok',results:lr})}catch(e){sources.push({provider:'lrclib',status:'temporarily-unavailable',results:[]})}
+   if(lr.length)return {results:lr,sources,usedProvider:'lrclib'};
+   const fb=await searchFallback(track);sources.push(fb);
+   return {results:fb.results||[],sources,usedProvider:null};
  }
  function rankAppleMusic(t,s=[]){return rank(t,s.map(x=>({provider:'apple-music',providerId:x.id,title:x.attributes?.name,artist:x.attributes?.artistName,album:x.attributes?.albumName,duration:Number(x.attributes?.durationInMillis||0)/1000,isrc:x.attributes?.isrc||null,raw:x})))}
  function chooseLyrics(t,r=[]){const a=rank(t,r),b=a[0]||null;return !b||b.match.confidence==='weak'?{status:'no-reliable-match',best:null,candidates:a}:{status:b.match.confidence,best:b,candidates:a}}
- return{normalize,versionTags,identifyCandidate,rank,recordingKey,searchLrclib,rankAppleMusic,chooseLyrics};
+ return{normalize,versionTags,identifyCandidate,rank,recordingKey,searchLrclib,searchFallback,searchLyricsMultiSource,rankAppleMusic,chooseLyrics};
 })();
 window.KWTrackIdentity=KWTrackIdentity;
