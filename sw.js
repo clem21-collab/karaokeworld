@@ -1,4 +1,4 @@
-const CACHE="karaokeworld-v0.20.0-halloween";
+const CACHE="karaokeworld-v0.20.1-halloween";
 const FILES=["./","./index.html","./style.css","./app.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));

@@ -166,7 +166,7 @@ async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDur
   $('lyricsQuery').value=title;$('lyricsArtist').value=artist;
   $('lyricsResults').innerHTML='<p class="empty">Recherche automatique des paroles synchronisées…</p>';$('state').textContent="Recherche des paroles…";
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20"}, urls=[];
+    const headers={"Lrclib-Client":"KaraokeWorld v0.20.1"}, urls=[];
     if(title&&artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     if(title) urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
     if(title) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title));
@@ -206,15 +206,39 @@ async function autoLyricsForYouTube(query,videoTitle="",channelTitle="",videoDur
     useAutoLyrics(hit,true);
   }catch(e){$('state').textContent="Vidéo YouTube · paroles non chargées";$('lyricsResults').innerHTML=`<p class="empty">Recherche automatique impossible : ${esc(e.message)}</p>`}
 }
+
+const AUTO_SYNC_KEY="kw_auto_sync_v1";
+function autoSyncMap(){try{return JSON.parse(localStorage.getItem(AUTO_SYNC_KEY)||"{}")||{}}catch(e){return {}}}
+function syncKey(){return currentYoutubeId?("yt:"+currentYoutubeId):""}
+function setOffset(v,label="Synchro"){lyricOffset=Math.max(-20,Math.min(20,Math.round(Number(v||0)*10)/10));if($('offsetValue'))$('offsetValue').textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s';updateStageOffset();if(label&&$('state'))$('state').textContent=label}
+function saveVideoOffset(){const k=syncKey();if(!k)return;const m=autoSyncMap();m[k]=lyricOffset;localStorage.setItem(AUTO_SYNC_KEY,JSON.stringify(m))}
+function applyAutoSync(hit){
+  const k=syncKey(),m=autoSyncMap();
+  if(k&&Number.isFinite(Number(m[k]))){setOffset(Number(m[k]),"YouTube + paroles · synchro mémorisée");return "mémorisée"}
+  let vd=0;try{vd=ytPlayer&&ytPlayer.getDuration?Number(ytPlayer.getDuration()||0):0}catch(e){}
+  const ld=Number(hit?.duration||0);
+  // Estimation volontairement prudente : pour un petit surplus de durée vidéo,
+  // on attribue une partie du surplus à l'intro du clip. Les gros écarts ne sont pas corrigés automatiquement.
+  let estimated=0;
+  if(vd>0&&ld>0){
+    const extra=vd-ld;
+    if(extra>=1.5&&extra<=12) estimated=Math.min(6,extra*.55);
+    else if(extra<=-1.5&&extra>=-6) estimated=Math.max(-3,extra*.35);
+  }
+  setOffset(estimated,estimated?"YouTube + paroles · Auto Sync appliqué":"YouTube + paroles synchronisées");
+  return estimated?"automatique":"neutre"
+}
+
 function useAutoLyrics(hit,automatic=false){
   const parsed=parseLrc(hit.syncedLyrics);if(!parsed.length)return;
   lrc=parsed;$('lyricsQuery').value=hit.trackName||$('lyricsQuery').value;$('lyricsArtist').value=hit.artistName||$('lyricsArtist').value;
-  $('state').textContent="YouTube + paroles synchronisées";
+  const syncMode=applyAutoSync(hit);
+  $('state').textContent=syncMode==='mémorisée'?"YouTube + paroles · synchro mémorisée":(syncMode==='automatique'?"YouTube + paroles · Auto Sync":"YouTube + paroles synchronisées");
   $('lyricsResults').innerHTML=`<article class="lyric-result"><h3>${esc(hit.trackName||"")}</h3><p>${esc(hit.artistName||"")} · ✓ ${automatic?"trouvé et chargé automatiquement":"paroles chargées"}</p></article>`;
   renderLyrics(0);$('player').scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 async function youtubeEmbed(id,title="Vidéo YouTube",query="",channelTitle=""){
-  currentYoutubeId=id;currentYoutubeTitle=title;currentYoutubeChannel=channelTitle;const watch=`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;youtubeQuery=(query||$('onlineQuery').value||title).trim();currentId=null;$('audio').pause();$('video').pause();$('audio').classList.add('hidden');$('video').classList.add('hidden');lrc=[];renderLyrics(0);
+  currentYoutubeId=id;currentYoutubeTitle=title;currentYoutubeChannel=channelTitle;setOffset(0,'');const watch=`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;youtubeQuery=(query||$('onlineQuery').value||title).trim();currentId=null;$('audio').pause();$('video').pause();$('audio').classList.add('hidden');$('video').classList.add('hidden');lrc=[];renderLyrics(0);
   $('youtubePlayer').innerHTML=`<div class="youtube-frame"><div id="ytApiPlayer"></div></div><div class="youtube-fallback"><span>Lecture YouTube synchronisée avec les paroles.</span><a class="button-link" href="${watch}" target="_blank" rel="noopener noreferrer">▶ Ouvrir sur YouTube</a></div>`;$('youtubePlayer').classList.remove('hidden');
   try{await ensureYouTubeApi();if(ytPlayer&&typeof ytPlayer.destroy==="function")try{ytPlayer.destroy()}catch(e){}ytPlayer=new YT.Player('ytApiPlayer',{videoId:id,playerVars:{rel:0,playsinline:1,origin:(location.protocol==='http:'||location.protocol==='https:')?location.origin:undefined},events:{onReady:()=>{startYoutubeSync();prepareLyricsForYouTube(youtubeQuery,title,channelTitle);setTimeout(()=>{let d=0;try{d=ytPlayer.getDuration()||0}catch(e){}autoLyricsForYouTube(youtubeQuery,title,channelTitle,d)},250)},onStateChange:e=>{if(e.data===YT.PlayerState.PLAYING)startYoutubeSync();if(e.data===YT.PlayerState.ENDED&&!$('karaokeStage').classList.contains('hidden')){$('stageSongTitle').textContent='Bravo ! 🎉';$('stageSongArtist').textContent='Chanson terminée';$('stageSongInfo').classList.remove('fade')}}}});}catch(e){$('onlineStatus').textContent=e.message}
   $('state').textContent='YouTube prêt';$('player').scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -227,13 +251,13 @@ async function searchYouTubeCompatible(query){const q=query.trim();if(!q){$('onl
 function searchYouTubeFor(query){$('onlineQuery').value=query.trim();searchYouTubeCompatible(query);$('online').scrollIntoView({behavior:'smooth',block:'start'})}
 $('searchEverywhere').onclick=()=>searchYouTubeFor($('query').value);$('query').addEventListener('keydown',e=>{if(e.key==='Enter')searchYouTubeFor($('query').value)});$('youtubeSearch').onclick=()=>searchYouTubeCompatible($('onlineQuery').value);$('onlineQuery').addEventListener('keydown',e=>{if(e.key==='Enter')$('youtubeSearch').click()});
 $('loadYoutube').onclick=()=>{const raw=$('youtubeUrl').value.trim(),id=youtubeVideoId(raw);if(!id){$('onlineStatus').textContent='Lien YouTube non reconnu.';return}youtubeEmbed(id,'Vidéo YouTube',$('onlineQuery').value);$('onlineStatus').textContent='Lien chargé. Vérifie ensuite le titre et l’artiste avant de rechercher les paroles.'};$('youtubeUrl').addEventListener('keydown',e=>{if(e.key==='Enter')$('loadYoutube').click()});
-$('offsetMinus').onclick=()=>{lyricOffset=Math.round((lyricOffset-.5)*10)/10;$('offsetValue').textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'};$('offsetPlus').onclick=()=>{lyricOffset=Math.round((lyricOffset+.5)*10)/10;$('offsetValue').textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'};$('offsetReset').onclick=()=>{lyricOffset=0;$('offsetValue').textContent='0.0 s'};
+$('offsetMinus').onclick=()=>{setOffset(lyricOffset-.5,'');saveVideoOffset()};$('offsetPlus').onclick=()=>{setOffset(lyricOffset+.5,'');saveVideoOffset()};$('offsetReset').onclick=()=>{setOffset(0,'');saveVideoOffset()};
 async function searchOnlineLyrics(){
   const title=$("lyricsQuery").value.trim(), artist=$("lyricsArtist")?.value.trim()||"", out=$("lyricsResults");
   if(!title){out.innerHTML='<p class="empty">Saisis au moins le titre de la chanson.</p>';return}
   out.innerHTML='<p class="empty">Recherche en cours…</p>';
   try{
-    const headers={"Lrclib-Client":"KaraokeWorld v0.20"};
+    const headers={"Lrclib-Client":"KaraokeWorld v0.20.1"};
     const urls=[];
     if(artist) urls.push("https://lrclib.net/api/search?track_name="+encodeURIComponent(title)+"&artist_name="+encodeURIComponent(artist));
     urls.push("https://lrclib.net/api/search?q="+encodeURIComponent([title,artist].filter(Boolean).join(" ")));
