@@ -133,70 +133,52 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 .us-stage > .us-line.next:last-child{grid-row:2}
 @media(max-width:700px){#stageLyrics:has(.us-stage){height:50vh;min-height:270px}.us-stage .us-line.current{font-size:clamp(1.25rem,5.5vw,2.4rem)}.us-stage .us-line.next{font-size:clamp(.95rem,4vw,1.5rem)}}
 
-/* v0.23.6 — correctif plein écran UltraStar */
-:fullscreen #stage,
-:-webkit-full-screen #stage{
-  position:relative;
-  overflow:hidden;
+/* v0.23.7 — affichage UltraStar robuste */
+.us-stage{grid-template-columns:minmax(0,1fr)!important}
+.us-stage>*{grid-column:1!important;min-width:0}
+.us-stage .us-line.current{grid-row:1!important;align-self:center}
+.us-stage .us-line.next{grid-row:2!important;align-self:center}
+
+/* Rendu texte robuste : aucune syllabe future transparente. */
+.us-syl,.us-line.current .us-syl,.us-line.next .us-syl{
+ background:none!important;background-image:none!important;
+ -webkit-background-clip:border-box!important;background-clip:border-box!important;
+ -webkit-text-fill-color:currentColor!important;
+ color:rgba(255,255,255,.52)!important;opacity:1!important;
+ filter:none;transform:none!important
 }
-:fullscreen #stageLyrics,
-:-webkit-full-screen #stageLyrics{
-  position:absolute !important;
-  inset:8vh 3vw 13vh 3vw !important;
-  width:auto !important;
-  height:auto !important;
-  min-height:0 !important;
-  max-height:none !important;
-  margin:0 !important;
-  padding:0 !important;
-  overflow:visible !important;
-  z-index:50 !important;
-  pointer-events:none;
-  background:transparent !important;
+.us-line.current .us-syl.done{color:#ffb12b!important}
+.us-line.current .us-syl.singing{color:#ffb12b!important;text-shadow:0 0 14px rgba(255,106,0,.72);filter:drop-shadow(0 0 5px rgba(255,106,0,.38))}
+.us-line.next .us-syl{color:rgba(255,255,255,.78)!important}
+
+/* Intro : chaque élément a sa propre rangée. */
+.us-stage.intro{grid-template-rows:auto 1fr 1fr!important}
+.us-stage.intro .us-hint{grid-row:1!important;align-self:end;padding-top:1rem}
+.us-stage.intro .us-count{grid-row:2!important;align-self:center}
+.us-stage.intro .us-line.next{grid-row:3!important;align-self:center}
+.us-stage.instrumental{grid-template-rows:1fr 1fr!important}
+.us-stage.instrumental .us-instrumental{grid-row:1!important;align-self:center}
+.us-stage.instrumental .us-count{grid-row:1!important;align-self:end;padding-bottom:.35rem}
+.us-stage.instrumental .us-line.next{grid-row:2!important}
+
+/* Le vrai élément plein écran est #karaokeStage. */
+#karaokeStage:fullscreen .stage-lyrics-wrap,
+#karaokeStage:-webkit-full-screen .stage-lyrics-wrap{position:relative;overflow:hidden}
+#karaokeStage:fullscreen #stageLyrics,
+#karaokeStage:-webkit-full-screen #stageLyrics{
+ position:relative!important;inset:auto!important;width:100%!important;height:100vh!important;
+ min-height:0!important;padding:clamp(70px,9vh,105px) clamp(20px,3vw,55px) clamp(48px,7vh,80px)!important;
+ overflow:hidden!important;z-index:2!important;pointer-events:auto;background:transparent!important
 }
-:fullscreen #stageLyrics .us-stage,
-:-webkit-full-screen #stageLyrics .us-stage{
-  width:100% !important;
-  height:100% !important;
-  min-height:0 !important;
-  overflow:visible !important;
-  position:relative;
-  z-index:51;
-  background:transparent !important;
+#karaokeStage:fullscreen #stageLyrics .us-stage,
+#karaokeStage:-webkit-full-screen #stageLyrics .us-stage{
+ width:100%!important;height:100%!important;padding:0!important;overflow:hidden!important;background:transparent!important
 }
-:fullscreen #stageLyrics .us-line,
-:-webkit-full-screen #stageLyrics .us-line{
-  overflow:visible !important;
-  max-height:none !important;
-  position:relative;
-  z-index:52;
+#karaokeStage:fullscreen .us-line.current,
+#karaokeStage:-webkit-full-screen .us-line.current{
+ width:min(1200px,98%)!important;font-size:clamp(1.7rem,3.5vw,3.9rem)!important;line-height:1.14!important
 }
-:fullscreen #stageLyrics .us-count,
-:-webkit-full-screen #stageLyrics .us-count,
-:fullscreen #stageLyrics .us-instrumental,
-:-webkit-full-screen #stageLyrics .us-instrumental,
-:fullscreen #stageLyrics .us-hint,
-:-webkit-full-screen #stageLyrics .us-hint{
-  position:relative !important;
-  z-index:60 !important;
-  visibility:visible !important;
-  opacity:1 !important;
-}
-:fullscreen #stageControls,
-:-webkit-full-screen #stageControls{
-  position:absolute;
-  left:3vw; right:3vw; bottom:2vh;
-  z-index:80;
-}
-/* Les éventuels fonds/overlays du stage restent derrière les paroles. */
-:fullscreen #stage::before,
-:fullscreen #stage::after,
-:-webkit-full-screen #stage::before,
-:-webkit-full-screen #stage::after{
-  z-index:0 !important;
-  pointer-events:none;
-}
-@media (orientation:landscape){
-  :fullscreen #stageLyrics,
-  :-webkit-full-screen #stageLyrics{inset:6vh 3vw 12vh 3vw !important}
+#karaokeStage:fullscreen .us-line.next,
+#karaokeStage:-webkit-full-screen .us-line.next{
+ width:min(1100px,96%)!important;font-size:clamp(1.15rem,2.25vw,2.1rem)!important;line-height:1.16!important
 }
