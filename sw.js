@@ -1,4 +1,4 @@
-const CACHE="karaokeworld-v0.23.3-ultrastar-visible-lyrics";
+const CACHE="karaokeworld-v0.23.4-ultrastar-display-fixes";
 const FILES=["./","./index.html","./style.css","./app.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));

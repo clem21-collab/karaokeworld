@@ -114,3 +114,8 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 @supports not (-webkit-background-clip:text){
   .us-syl{background:none!important;color:#fff!important;-webkit-text-fill-color:initial!important}
 }
+
+/* v0.23.4 — espaces UltraStar et timeline */
+.us-line{white-space:normal;word-spacing:.08em}
+.us-syl{white-space:nowrap}
+.us-line.current,.us-line.next{overflow-wrap:normal;word-break:normal}

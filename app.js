@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.3";
+const APP_VERSION="0.23.4";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -429,7 +429,8 @@ function ultraStarLineHTML(group,sec,role){
   const words=syl.map(x=>{
     const done=sec>=x.end_s, active=sec>=x.start_s&&sec<x.end_s;
     const pct=active?Math.max(0,Math.min(100,(sec-x.start_s)/Math.max(.04,x.end_s-x.start_s)*100)):(done?100:0);
-    return `<span class="us-syl ${done?"done":""} ${active?"singing":""}" style="--us-progress:${pct.toFixed(1)}%">${ultraStarEsc(x.text)}</span>`;
+    const txt=ultraStarEsc(x.text).replace(/ /g,"&nbsp;");
+    return `<span class="us-syl ${done?"done":""} ${active?"singing":""}" style="--us-progress:${pct.toFixed(1)}%">${txt}</span>`;
   }).join("");
   return `<div class="us-line ${role||""}">${words||"♪"}</div>`;
 }
@@ -459,7 +460,7 @@ function renderUltraStarStage(sec){
     const isIntro=nextIdx===0;
     box.innerHTML=`<div class="us-stage">
       ${isIntro?'<div class="us-hint">Préparez-vous…</div>':'<div class="us-instrumental">♪ Instrumental ♪</div>'}
-      ${wait<=5?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
+      ${(isIntro||wait<=5)?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
       ${ultraStarLineHTML(next,sec,"next")}
     </div>`;
     if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(next,sec,"next")}</div>`;
@@ -475,9 +476,14 @@ function ultraStarTick(){
   if(!ultraStarCurrentId)return;
   const a=$("audio"),sec=a.currentTime||0;
   renderUltraStarStage(sec);
-  const seek=$("seek"); if(seek&&Number.isFinite(a.duration)&&a.duration>0)seek.value=(sec/a.duration)*100;
+  const dur=Number.isFinite(a.duration)?a.duration:0;
+  const pct=dur>0?(sec/dur)*100:0;
+  const seek=$("seek"); if(seek&&dur>0)seek.value=pct;
   if($("elapsed"))$("elapsed").textContent=fmt(sec);
-  if($("duration"))$("duration").textContent=fmt(a.duration);
+  if($("duration"))$("duration").textContent=fmt(dur);
+  if($("stageSeek")&&dur>0)$("stageSeek").value=pct;
+  if($("stageElapsed"))$("stageElapsed").textContent=fmt(sec);
+  if($("stageDuration"))$("stageDuration").textContent=fmt(dur);
   ultraStarRaf=requestAnimationFrame(ultraStarTick);
 }
 function openUltraStarCatalog(){
