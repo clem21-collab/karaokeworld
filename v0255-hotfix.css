@@ -1,0 +1,10 @@
+/* KaraokeWorld v0.25.5 — barre plein écran indépendante */
+.stage-global-toolbar{display:none}
+#karaokeStage.layout-100{grid-template-columns:1fr!important}
+#karaokeStage.layout-100 .stage-lyrics-wrap{position:relative!important;z-index:5!important;width:100vw!important;height:100vh!important;background:radial-gradient(ellipse at 50% 45%,#242058 0,#081525 65%,#050b14 100%)!important}
+#karaokeStage.layout-100 .stage-video{display:none!important;visibility:hidden!important;pointer-events:none!important}
+#karaokeStage.layout-100 .stage-global-toolbar{display:flex!important;position:absolute!important;top:18px!important;right:18px!important;z-index:999!important;gap:6px!important;align-items:center!important;flex-wrap:wrap!important;padding:8px!important;background:rgba(6,14,26,.88)!important;border:1px solid rgba(135,174,218,.42)!important;border-radius:12px!important;box-shadow:0 8px 26px rgba(0,0,0,.35)!important;backdrop-filter:blur(10px)!important;pointer-events:auto!important}
+#karaokeStage.layout-100 .stage-global-toolbar button{display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;padding:7px 10px!important;font-size:11px!important;white-space:nowrap!important}
+#karaokeStage.layout-100 .stage-global-toolbar .active{background:#fff!important;color:#091426!important}
+#karaokeStage:fullscreen.layout-100 .stage-global-toolbar,#karaokeStage:-webkit-full-screen.layout-100 .stage-global-toolbar{display:flex!important;position:fixed!important;top:18px!important;right:18px!important;z-index:2147483647!important}
+@media(max-width:800px){#karaokeStage.layout-100 .stage-global-toolbar{top:8px!important;right:8px!important;left:8px!important;justify-content:flex-end!important}}
