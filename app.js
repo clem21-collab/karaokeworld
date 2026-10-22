@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.24.3";
+const APP_VERSION="0.25.0";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -355,7 +355,7 @@ let youtubeHome=null;
 function updateStageOffset(){if($("stageOffset"))$("stageOffset").textContent='Synchro '+(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'}
 function stageSongMeta(){let title=currentYoutubeTitle||'',artist=currentYoutubeChannel||'';if(currentId){const t=tracks.find(x=>x.id===currentId);if(t){title=t.title;artist=t.artist}}$("stageSongTitle").textContent=cleanYoutubeTitle(title)||'KaraokeWorld';$("stageSongArtist").textContent=cleanYoutubeTitle(artist)||'Prêt à chanter 🎤';clearTimeout(stageInfoTimer);$("stageSongInfo").classList.remove('fade');stageInfoTimer=setTimeout(()=>$("stageSongInfo")?.classList.add('fade'),5500)}
 async function enterKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(!stage)return;if(yp&&!yp.classList.contains('hidden')){youtubeHome={parent:yp.parentNode,next:yp.nextSibling};$("stageVideoSlot").appendChild(yp)}if(currentYoutubeId)$("stageBg").style.backgroundImage=`url(https://i.ytimg.com/vi/${currentYoutubeId}/hqdefault.jpg)`;else $("stageBg").style.backgroundImage='';stage.classList.remove('hidden');stage.setAttribute('aria-hidden','false');stageLastIdx=-999;if(ultraStarCurrentId){ultraStarVisualIdx=-999;renderUltraStarStage($("audio")?.currentTime||0)}else{renderStageLyrics(-1,0)}updateStageOffset();stageSongMeta();try{if(stage.requestFullscreen)await stage.requestFullscreen()}catch(e){}}
-function exitKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}stage.classList.add('hidden');stage.setAttribute('aria-hidden','true');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
+function exitKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");const usv=$("ultraStarStageVideo");if(usv)usv.pause();if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}stage.classList.add('hidden');stage.setAttribute('aria-hidden','true');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
 async function stageCountdownPlay(){if(countdownRunning)return;if(!$("stageCountdownEnabled").checked){$("play").click();return}countdownRunning=true;const c=$("stageCountdown");c.classList.remove('hidden');for(const v of ['3','2','1','🎤']){c.textContent=v;await new Promise(r=>setTimeout(r,v==='🎤'?450:700))}c.classList.add('hidden');countdownRunning=false;$("play").click()}
 function seekRelative(delta){try{if(ytPlayer&&typeof ytPlayer.getCurrentTime==='function'){ytPlayer.seekTo(Math.max(0,(ytPlayer.getCurrentTime()||0)+delta),true);return}}catch(e){}const m=$("video").classList.contains("hidden")?$("audio"):$("video");if(m.duration)m.currentTime=Math.max(0,Math.min(m.duration,m.currentTime+delta))}
 $("fullscreenKaraoke").onclick=enterKaraokeStage;$("exitFullscreen").onclick=exitKaraokeStage;
@@ -368,7 +368,34 @@ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement
 
 
 // === KaraokeWorld UltraStar engine v0.23.0 ===
-let ultraStarGroups=[], ultraStarRaf=0, ultraStarCurrentId=null;
+let ultraStarGroups=[], ultraStarRaf=0, ultraStarCurrentId=null, ultraStarVideoUrl="", ultraStarVideoOffset=0;
+function ultraStarVideoFileName(t){
+  return String(t?.ultraStar?.video||t?.ultraStar?.meta?.VIDEO||"").trim();
+}
+function ultraStarVideoSupported(file){
+  const n=String(file?.name||file||"").toLowerCase();
+  return /\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg)$/i.test(n);
+}
+function setUltraStarStageVideo(track){
+  const v=$("ultraStarStageVideo");if(!v)return;
+  v.pause();v.removeAttribute("src");v.load();v.classList.add("hidden");
+  ultraStarVideoUrl="";
+  if(!track?.videoBlob)return;
+  ultraStarVideoUrl=URL.createObjectURL(track.videoBlob);
+  v.src=ultraStarVideoUrl;
+  v.classList.remove("hidden");
+}
+function syncUltraStarVideo(sec){
+  const v=$("ultraStarStageVideo");if(!v||!ultraStarVideoUrl)return;
+  const target=Math.max(0,sec+Number(ultraStarVideoOffset||0));
+  if(Number.isFinite(v.duration)&&Math.abs((v.currentTime||0)-target)>.35){
+    try{v.currentTime=Math.min(v.duration,target)}catch(e){}
+  }
+  const a=$("audio");
+  if(a&&!a.paused){
+    if(v.paused)v.play().catch(()=>{});
+  }else if(!v.paused)v.pause();
+}
 function usNorm(s){return String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
 function usDecode(buf){for(const enc of ["utf-8","windows-1252","iso-8859-1"]){try{return new TextDecoder(enc,{fatal:enc==="utf-8"}).decode(buf)}catch(e){}}return new TextDecoder().decode(buf)}
 function parseUltraStar(txt){
@@ -417,7 +444,9 @@ playTrack=function(id){
   const t=tracks.find(x=>x.id===id);
   if(!t||t.kind!=="ultrastar"){ultraStarCurrentId=null;cancelAnimationFrame(ultraStarRaf);return originalPlayTrack(id)}
   currentId=id;lrc=t.lrc||[];ultraStarGroups=t.ultraStar?.groups||[];ultraStarCurrentId=id;
-  $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s`;
+  ultraStarVideoOffset=Number(t.ultraStar?.videoGap||t.ultraStar?.meta?.VIDEOGAP||0);
+  setUltraStarStageVideo(t);
+  $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s${t.videoBlob?" · Vidéo ✓":""}`;
   $("audio").pause();$("video").pause();$("video").classList.add("hidden");$("audio").classList.remove("hidden");
   $("audio").src=t.url;$("audio").play().catch(()=>{});stageLastIdx=-999;ultraStarVisualIdx=-999;renderUltraStarStage(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
   cancelAnimationFrame(ultraStarRaf);ultraStarTick();
@@ -507,6 +536,7 @@ function ultraStarTick(){
   if(!ultraStarCurrentId)return;
   const a=$("audio"),sec=a.currentTime||0;
   renderUltraStarStage(sec);
+  syncUltraStarVideo(sec);
   const dur=Number.isFinite(a.duration)?a.duration:0;
   const pct=dur>0?(sec/dur)*100:0;
   const seek=$("seek"); if(seek&&dur>0)seek.value=pct;
