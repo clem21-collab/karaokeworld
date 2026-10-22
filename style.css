@@ -82,3 +82,19 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 @keyframes kwGhost{50%{transform:translate(-8px,-16px) rotate(-4deg);opacity:.24}}
 @media(prefers-reduced-motion:reduce){.hero::before,.home-hero::before,.hero::after,.home-hero::after,main::after{animation:none!important}}
 @media(max-width:760px){.hero::before,.home-hero::before{font-size:21px}.hero::after,.home-hero::after{font-size:36px;opacity:.38}main::after{font-size:32px}}
+
+/* KaraokeWorld v0.23.1 — suivi UltraStar syllabe par syllabe */
+.us-stage{min-height:52vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1.4rem;padding:2rem}
+.us-line{width:min(1100px,94vw);font-weight:800;line-height:1.35;letter-spacing:.01em}
+.us-line.current{font-size:clamp(2rem,5vw,4.8rem)}
+.us-line.next{font-size:clamp(1.35rem,3vw,2.5rem);opacity:.42}
+.us-syl{position:relative;display:inline;background:linear-gradient(90deg,currentColor var(--us-progress,0%),transparent var(--us-progress,0%));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-stroke:1px currentColor}
+.us-syl.done,.us-syl.singing{filter:brightness(1.45)}
+.us-syl.singing{transform:scale(1.03);display:inline-block}
+.us-instrumental{font-size:clamp(1.8rem,4vw,3.6rem);font-weight:800;opacity:.72}
+.us-count{font-size:clamp(3rem,9vw,8rem);font-weight:900;line-height:1}
+.us-hint{font-size:clamp(1.1rem,2vw,1.7rem);opacity:.65}
+.us-compact .us-line{width:auto}
+.us-compact .us-line.current{font-size:clamp(1.5rem,3vw,2.5rem)}
+.us-compact .us-line.next{font-size:clamp(1rem,2vw,1.45rem);margin-top:.75rem}
+#stageLyrics:has(.us-stage){overflow:hidden}

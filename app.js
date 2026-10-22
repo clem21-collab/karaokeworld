@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.0";
+const APP_VERSION="0.23.1";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -419,13 +419,51 @@ playTrack=function(id){
   currentId=id;lrc=t.lrc||[];ultraStarGroups=t.ultraStar?.groups||[];ultraStarCurrentId=id;
   $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s`;
   $("audio").pause();$("video").pause();$("video").classList.add("hidden");$("audio").classList.remove("hidden");
-  $("audio").src=t.url;$("audio").play().catch(()=>{});renderLyrics(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
+  $("audio").src=t.url;$("audio").play().catch(()=>{});stageLastIdx=-999;renderUltraStarStage(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
   cancelAnimationFrame(ultraStarRaf);ultraStarTick();
+}
+function ultraStarEsc(s){return esc(s||"")}
+function ultraStarLineHTML(group,sec,role){
+  if(!group)return "";
+  const syl=group.syllables||[];
+  const words=syl.map(x=>{
+    const done=sec>=x.end_s, active=sec>=x.start_s&&sec<x.end_s;
+    const pct=active?Math.max(0,Math.min(100,(sec-x.start_s)/Math.max(.04,x.end_s-x.start_s)*100)):(done?100:0);
+    return `<span class="us-syl ${done?"done":""} ${active?"singing":""}" style="--us-progress:${pct.toFixed(1)}%">${ultraStarEsc(x.text)}</span>`;
+  }).join("");
+  return `<div class="us-line ${role||""}">${words||"♪"}</div>`;
+}
+function renderUltraStarStage(sec){
+  const box=$("stageLyrics"), normal=$("lyrics");
+  if(!box||!ultraStarGroups.length)return;
+  let idx=-1;
+  for(let i=0;i<ultraStarGroups.length;i++){if(sec>=ultraStarGroups[i].start_s)idx=i;else break}
+  // If current line has ended, treat the space before the next one as instrumental.
+  let current=idx>=0?ultraStarGroups[idx]:null;
+  let next=ultraStarGroups[idx+1]||null;
+  const inGap=current&&sec>current.end_s&&next&&sec<next.start_s;
+  const beforeFirst=idx<0&&ultraStarGroups[0];
+  if(beforeFirst){
+    const wait=Math.max(0,ultraStarGroups[0].start_s-sec);
+    box.innerHTML=`<div class="us-stage"><div class="us-count">${wait>1?Math.ceil(wait):"🎤"}</div><div class="us-hint">Préparez-vous…</div>${ultraStarLineHTML(ultraStarGroups[0],sec,"next")}</div>`;
+  }else if(inGap){
+    const wait=next.start_s-sec;
+    box.innerHTML=`<div class="us-stage"><div class="us-instrumental">♪ Instrumental ♪</div>${wait<=5?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}${ultraStarLineHTML(next,sec,"next")}</div>`;
+  }else{
+    box.innerHTML=`<div class="us-stage">${ultraStarLineHTML(current,sec,"current")}${ultraStarLineHTML(next,sec,"next")}</div>`;
+  }
+  // Compact player view: current + next line, while fullscreen gets the richer stage.
+  if(normal){
+    normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(current||ultraStarGroups[0],sec,"current")}${ultraStarLineHTML(next||ultraStarGroups[1],sec,"next")}</div>`;
+  }
 }
 function ultraStarTick(){
   if(!ultraStarCurrentId)return;
-  const a=$("audio"),sec=a.currentTime||0;renderLyrics(sec);
-  // Preserve exact UltraStar line timing; the validated source remains BPM+GAP.
+  const a=$("audio"),sec=a.currentTime||0;
+  renderUltraStarStage(sec);
+  const seek=$("seek"); if(seek&&Number.isFinite(a.duration)&&a.duration>0)seek.value=(sec/a.duration)*100;
+  if($("elapsed"))$("elapsed").textContent=fmt(sec);
+  if($("duration"))$("duration").textContent=fmt(a.duration);
   ultraStarRaf=requestAnimationFrame(ultraStarTick);
 }
 function openUltraStarCatalog(){
