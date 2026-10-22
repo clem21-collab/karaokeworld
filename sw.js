@@ -1,8 +1,8 @@
-const CACHE="karaokeworld-v0.25.5-fullscreen-toolbar";
-const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./app.js","./v0255-hotfix.js","./manifest.webmanifest"];
+const CACHE="karaokeworld-v0.26.0-video-compat";
+const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-compat-worker-v0260.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
-self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE&&k!=="karaokeworld-converted-video-v1").map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("message",e=>{if(e.data&&e.data.type==="SKIP_WAITING")self.skipWaiting()});
 self.addEventListener("fetch",e=>{
   if(e.request.method!=="GET")return;
