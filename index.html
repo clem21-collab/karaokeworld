@@ -20,6 +20,7 @@
 <meta name="twitter:description" content="Karaoké gratuit en ligne avec vidéos compatibles et paroles synchronisées.">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./v0255-hotfix.css">
 <script type="application/ld+json">
 {
   "@context":"https://schema.org",
@@ -35,7 +36,7 @@
 </script>
 </head>
 <body>
-<header><div class="brand">🎤 Karaoke<span>World</span><small> BETA · v0.25.4 · UltraStar 🎤</small></div><div class="top-actions"><button id="install" class="secondary hidden">Installer l’application</button><button id="import">＋ Importer</button><button id="importUltraStar" class="secondary" type="button">📁 Dossier UltraStar</button><input id="files" type="file" accept="audio/*,video/*,.lrc,.txt" multiple hidden><input id="ultraStarFolder" type="file" webkitdirectory multiple hidden></div></header>
+<header><div class="brand">🎤 Karaoke<span>World</span><small> BETA · v0.25.5 · UltraStar 🎤</small></div><div class="top-actions"><button id="install" class="secondary hidden">Installer l’application</button><button id="import">＋ Importer</button><button id="importUltraStar" class="secondary" type="button">📁 Dossier UltraStar</button><input id="files" type="file" accept="audio/*,video/*,.lrc,.txt" multiple hidden><input id="ultraStarFolder" type="file" webkitdirectory multiple hidden></div></header>
 <div class="shell"><aside><button class="nav active" data-page="home">⌂ Accueil</button><button class="nav" data-page="library">▣ Bibliothèque</button><button class="nav" data-page="playlist">☷ Playlists</button><button class="nav" data-page="mic">🎙 Micro</button><button class="nav" data-page="settings">⚙ Paramètres</button><div class="side-info"><b>Mode hors ligne</b><p>Après la première ouverture en ligne, l’interface peut être mise en cache. Les fichiers audio doivent être ajoutés à la bibliothèque locale.</p></div></aside>
 <main><section class="home-hero" id="homeHero"><div class="home-glow"></div><div class="eyebrow">KARAOKEWORLD · VOTRE SCÈNE</div><h1>Choisissez une chanson.<br><span>Prenez le micro.</span></h1><p>Recherchez un titre ou un artiste : KaraokeWorld trouve la vidéo, prépare les paroles et vous emmène directement sur scène.</p><div class="home-search"><span>⌕</span><input id="query" placeholder="Rechercher une chanson ou un artiste…" aria-label="Rechercher une chanson ou un artiste"><button id="searchEverywhere" type="button">Rechercher</button></div><div class="hero-actions"><button id="start">🎤 Chanter maintenant</button><button id="homeLibrary" class="secondary" type="button">🎵 Mes chansons</button><button id="homePlaylists" class="secondary" type="button">☷ Playlists</button></div></section>
 <section id="page-home">
@@ -80,4 +81,11 @@
   <div class="stage-controls stage-layout-toolbar"><button class="stage-layout secondary active" data-layout="72">72/28</button><button class="stage-layout secondary" data-layout="80">80/20</button><button class="stage-layout secondary" data-layout="100">Paroles seules</button></div>
   <label class="stage-option"><input id="stageCountdownEnabled" type="checkbox" checked> Compte à rebours 3-2-1</label>
   <button id="exitFullscreen" class="secondary">✕ Quitter le mode karaoké</button>
-</div></div><script src="./app.js"></script><script src="./recently-sung.js"></script><script src="./song-covers.js"></script><script src="./youtube-lrclib-smart-match.js"></script></body></html>
+</div>
+<div class="stage-global-toolbar" id="stageGlobalToolbar" aria-label="Disposition plein écran">
+  <button class="stage-layout-fallback secondary" data-layout="72">72/28</button>
+  <button class="stage-layout-fallback secondary" data-layout="80">80/20</button>
+  <button class="stage-layout-fallback secondary" data-layout="100">Paroles seules</button>
+  <button id="exitFullscreenFallback" class="secondary">✕ Quitter</button>
+</div>
+</div><script src="./app.js"></script><script src="./recently-sung.js"></script><script src="./song-covers.js"></script><script src="./youtube-lrclib-smart-match.js"></script><script src="./v0255-hotfix.js"></script></body></html>
