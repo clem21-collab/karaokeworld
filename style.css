@@ -88,9 +88,21 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 .us-line{width:min(1100px,94vw);font-weight:800;line-height:1.35;letter-spacing:.01em}
 .us-line.current{font-size:clamp(2rem,5vw,4.8rem)}
 .us-line.next{font-size:clamp(1.35rem,3vw,2.5rem);opacity:.42}
-.us-syl{position:relative;display:inline;background:linear-gradient(90deg,currentColor var(--us-progress,0%),transparent var(--us-progress,0%));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-stroke:1px currentColor}
-.us-syl.done,.us-syl.singing{filter:brightness(1.45)}
-.us-syl.singing{transform:scale(1.03);display:inline-block}
+.us-syl{
+  --us-text:rgba(255,255,255,.42);
+  --us-sung:#ffffff;
+  position:relative;
+  display:inline;
+  color:var(--us-text);
+  -webkit-text-fill-color:transparent;
+  background-image:linear-gradient(90deg,var(--us-sung) 0 var(--us-progress,0%),var(--us-text) var(--us-progress,0%) 100%);
+  background-clip:text;
+  -webkit-background-clip:text;
+}
+.us-line.current .us-syl{--us-text:rgba(255,255,255,.50)}
+.us-line.next .us-syl{--us-text:rgba(255,255,255,.72);-webkit-text-fill-color:initial;background:none;color:var(--us-text)}
+.us-syl.done{--us-progress:100%}
+.us-syl.singing{display:inline-block;transform:scale(1.035);filter:drop-shadow(0 0 .35rem rgba(255,255,255,.45))}
 .us-instrumental{font-size:clamp(1.8rem,4vw,3.6rem);font-weight:800;opacity:.72}
 .us-count{font-size:clamp(3rem,9vw,8rem);font-weight:900;line-height:1}
 .us-hint{font-size:clamp(1.1rem,2vw,1.7rem);opacity:.65}
@@ -98,3 +110,7 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 .us-compact .us-line.current{font-size:clamp(1.5rem,3vw,2.5rem)}
 .us-compact .us-line.next{font-size:clamp(1rem,2vw,1.45rem);margin-top:.75rem}
 #stageLyrics:has(.us-stage){overflow:hidden}
+
+@supports not (-webkit-background-clip:text){
+  .us-syl{background:none!important;color:#fff!important;-webkit-text-fill-color:initial!important}
+}
