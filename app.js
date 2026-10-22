@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.25.2";
+const APP_VERSION="0.25.4";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -354,6 +354,18 @@ $("searchLyrics").onclick=searchOnlineLyrics;$("lyricsQuery").addEventListener("
 let youtubeHome=null;
 function updateStageOffset(){if($("stageOffset"))$("stageOffset").textContent='Synchro '+(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'}
 function stageSongMeta(){let title=currentYoutubeTitle||'',artist=currentYoutubeChannel||'';if(currentId){const t=tracks.find(x=>x.id===currentId);if(t){title=t.title;artist=t.artist}}$("stageSongTitle").textContent=cleanYoutubeTitle(title)||'KaraokeWorld';$("stageSongArtist").textContent=cleanYoutubeTitle(artist)||'Prêt à chanter 🎤';clearTimeout(stageInfoTimer);$("stageSongInfo").classList.remove('fade');stageInfoTimer=setTimeout(()=>$("stageSongInfo")?.classList.add('fade'),5500)}
+function enforceStageMediaMode(){
+  const stage=$("karaokeStage"), v=$("ultraStarStageVideo");
+  if(!stage)return;
+  const lyricsOnly=stage.classList.contains("layout-100");
+  if(lyricsOnly && v && !v.paused)v.pause();
+}
+const kwStageModeObserver=new MutationObserver(enforceStageMediaMode);
+document.addEventListener("DOMContentLoaded",()=>{
+  const s=$("karaokeStage");
+  if(s)kwStageModeObserver.observe(s,{attributes:true,attributeFilter:["class"]});
+});
+
 async function enterKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(!stage)return;if(yp&&!yp.classList.contains('hidden')){youtubeHome={parent:yp.parentNode,next:yp.nextSibling};$("stageVideoSlot").appendChild(yp)}if(currentYoutubeId)$("stageBg").style.backgroundImage=`url(https://i.ytimg.com/vi/${currentYoutubeId}/hqdefault.jpg)`;else $("stageBg").style.backgroundImage='';stage.classList.remove('hidden');stage.setAttribute('aria-hidden','false');stageLastIdx=-999;if(ultraStarCurrentId){ultraStarVisualIdx=-999;renderUltraStarStage($("audio")?.currentTime||0)}else{renderStageLyrics(-1,0)}updateStageOffset();stageSongMeta();try{if(stage.requestFullscreen)await stage.requestFullscreen()}catch(e){}}
 function exitKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");const usv=$("ultraStarStageVideo");if(usv)usv.pause();if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}stage.classList.add('hidden');stage.setAttribute('aria-hidden','true');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
 async function stageCountdownPlay(){if(countdownRunning)return;if(!$("stageCountdownEnabled").checked){$("play").click();return}countdownRunning=true;const c=$("stageCountdown");c.classList.remove('hidden');for(const v of ['3','2','1','🎤']){c.textContent=v;await new Promise(r=>setTimeout(r,v==='🎤'?450:700))}c.classList.add('hidden');countdownRunning=false;$("play").click()}
