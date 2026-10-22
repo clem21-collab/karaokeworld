@@ -1,4 +1,4 @@
-const CACHE="karaokeworld-v0.26.1-preconvert";
+const CACHE="karaokeworld-v0.26.2-multi-preconvert";
 const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-preconvert-v0261.js","./video-compat-worker-v0260.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
