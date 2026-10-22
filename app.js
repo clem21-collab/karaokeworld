@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.24.2";
+const APP_VERSION="0.24.3";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -488,9 +488,17 @@ function renderUltraStarStage(sec){
 
   if(idx!==ultraStarVisualIdx){
     // EXACTEMENT trois emplacements, dans les deux vues.
-    const html=ultraStarThreeLinesHTML(idx,sec);
+    // Lors d'un vrai changement, les 3 lignes glissent ensemble vers le haut.
+    const animate=ultraStarVisualIdx>=0 && idx>ultraStarVisualIdx;
+    const html=ultraStarThreeLinesHTML(idx,sec,animate?"singing-view us-slide-in":"singing-view");
     stageBox.innerHTML=html;
     normal.innerHTML=html;
+    if(animate){
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        stageBox.querySelector(".us-stage")?.classList.add("us-slide-go");
+        normal.querySelector(".us-stage")?.classList.add("us-slide-go");
+      }));
+    }
     ultraStarVisualIdx=idx;
   }
   ultraStarPaint(sec);

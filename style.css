@@ -390,3 +390,43 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 #stageLyrics .us-stage.singing-view .us-line.current{grid-row:2!important;align-self:center!important}
 #stageLyrics .us-stage.singing-view .us-line.next{grid-row:3!important;align-self:start!important}
 #stageLyrics .us-stage.singing-view .us-line.empty{visibility:hidden!important}
+
+/* v0.24.3 — transition verticale fluide des paroles UltraStar
+   La nouvelle phrase arrive du bas vers le centre et l'ancienne monte. */
+#stageLyrics .us-stage.singing-view,
+#lyrics .us-stage.singing-view{
+  will-change:transform,opacity;
+}
+#stageLyrics .us-stage.us-slide-in,
+#lyrics .us-stage.us-slide-in{
+  transform:translateY(clamp(34px,6vh,76px));
+  opacity:.58;
+  transition:none !important;
+}
+#stageLyrics .us-stage.us-slide-in.us-slide-go,
+#lyrics .us-stage.us-slide-in.us-slide-go{
+  transform:translateY(0);
+  opacity:1;
+  transition:
+    transform 520ms cubic-bezier(.22,.75,.22,1),
+    opacity 360ms ease-out !important;
+}
+/* Les lignes changent aussi doucement d'importance visuelle. */
+#stageLyrics .us-line,
+#lyrics .us-line{
+  transition:
+    opacity 520ms ease,
+    color 520ms ease,
+    font-size 520ms cubic-bezier(.22,.75,.22,1),
+    transform 520ms cubic-bezier(.22,.75,.22,1) !important;
+}
+@media (prefers-reduced-motion:reduce){
+  #stageLyrics .us-stage.us-slide-in,
+  #lyrics .us-stage.us-slide-in,
+  #stageLyrics .us-stage.us-slide-in.us-slide-go,
+  #lyrics .us-stage.us-slide-in.us-slide-go{
+    transform:none!important;
+    opacity:1!important;
+    transition:none!important;
+  }
+}
