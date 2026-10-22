@@ -1,159 +1,23 @@
-/* KaraokeWorld v0.26.1 — préparation automatique des vidéos UltraStar à l'import
-   Les vidéos déjà lisibles sont ignorées. Les vidéos incompatibles sont préparées
-   une par une avec le même cache que le moteur v0.26.0. */
+/* KaraokeWorld v0.26.2 — préconversion UltraStar parallèle (1 à 4, défaut 2) */
 (()=>{
-  const CACHE_NAME='karaokeworld-converted-video-v1';
-  const WORKER_URL='./video-compat-worker-v0260.js';
-  const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
-  const jobs=new Map();
-  let worker=null,jobSeq=0,runToken=0;
-
-  function $(id){return document.getElementById(id)}
-  function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-  function fp(file){return [file?.name||'video',file?.size||0,file?.lastModified||0].join('|')}
-  function cacheKey(file){
-    const base=fp(file);let h=2166136261;
-    for(let i=0;i<base.length;i++){h^=base.charCodeAt(i);h=Math.imul(h,16777619)}
-    return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href;
-  }
-  async function cached(file){
-    if(!('caches' in window))return false;
-    try{return !!(await (await caches.open(CACHE_NAME)).match(cacheKey(file)))}catch(e){return false}
-  }
-  async function putCached(file,blob){
-    if(!('caches' in window))return;
-    await (await caches.open(CACHE_NAME)).put(cacheKey(file),new Response(blob,{headers:{'Content-Type':'video/mp4'}}));
-  }
-
-  function ensureBox(){
-    let box=$('ultraStarPreconvert');
-    if(box)return box;
-    const panel=$('ultrastarPanel');if(!panel)return null;
-    box=document.createElement('div');box.id='ultraStarPreconvert';
-    box.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a;display:none';
-    box.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🎬 Préparation automatique des vidéos</b><span id="ultraStarPreconvertCount" class="status">0/0</span></div><div id="ultraStarPreconvertText" class="muted" style="margin-top:6px">En attente…</div><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:8px"><i id="ultraStarPreconvertBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#34d399,#56dfff)"></i></div>';
-    panel.appendChild(box);return box;
-  }
-  function show(text,current,total,pct){
-    const box=ensureBox();if(box)box.style.display='block';
-    const c=$('ultraStarPreconvertCount');if(c)c.textContent=`${current}/${total}`;
-    const t=$('ultraStarPreconvertText');if(t)t.textContent=text;
-    const b=$('ultraStarPreconvertBar');if(b)b.style.width=`${Math.max(0,Math.min(100,pct||0))}%`;
-  }
-  function done(text,total){
-    show(text,total,total,100);
-  }
-
-  function testPlayable(blob,timeout=3500){
-    return new Promise(resolve=>{
-      const v=document.createElement('video');v.preload='metadata';v.muted=true;v.playsInline=true;
-      const url=URL.createObjectURL(blob);let settled=false;
-      const end=ok=>{if(settled)return;settled=true;clearTimeout(timer);try{v.pause()}catch(e){}v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(url);resolve(ok)};
-      const timer=setTimeout(()=>end(v.readyState>=1),timeout);
-      v.onloadedmetadata=()=>end(true);v.oncanplay=()=>end(true);v.onerror=()=>end(false);v.src=url;v.load();
-    });
-  }
-
-  function ensureWorker(){
-    if(worker)return worker;
-    worker=new Worker(WORKER_URL);return worker;
-  }
-  async function convert(file,mode,onProgress){
-    const w=ensureWorker(),job=`pre-${Date.now()}-${++jobSeq}`,buf=await file.arrayBuffer();
-    return await new Promise(resolve=>{
-      const onMessage=e=>{
-        const d=e.data||{};if(d.job!==job)return;
-        if(d.type==='progress')onProgress?.(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));
-        if(d.type==='done'){w.removeEventListener('message',onMessage);resolve(new Blob([d.buffer],{type:'video/mp4'}))}
-        if(d.type==='error'){w.removeEventListener('message',onMessage);resolve(null)}
-      };
-      w.addEventListener('message',onMessage);
-      w.postMessage({type:'convert',job,name:file.name,mode,buffer:buf},[buf]);
-    });
-  }
-
-  async function referencedVideos(fileList){
-    const files=[...fileList],txts=files.filter(f=>/\.txt$/i.test(f.name)),found=[];
-    for(const tf of txts){
-      try{
-        const text=await tf.text(),meta={};
-        for(const line of text.split(/\r?\n/)){
-          if(line.startsWith('#')&&line.includes(':')){
-            const i=line.indexOf(':');meta[line.slice(1,i).toUpperCase()]=line.slice(i+1).trim();
-          }
-        }
-        const dir=(tf.webkitRelativePath||tf.name).split('/').slice(0,-1).join('/');
-        const wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop();
-        const exact=wanted?files.find(f=>((f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir)&&f.name.toLowerCase()===wanted.toLowerCase()):null;
-        const candidate=exact||files.find(f=>((f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir)&&VIDEO_RX.test(f.name));
-        if(candidate)found.push(candidate);
-      }catch(e){}
-    }
-    const unique=new Map();
-    for(const f of found)unique.set(fp(f),f);
-    return [...unique.values()];
-  }
-
-  async function prepareOne(file,index,total,token){
-    if(token!==runToken)return {status:'cancel'};
-    if(await cached(file)){show(`Déjà prête : ${file.name}`,index,total,100);return {status:'cached'}}
-    show(`Vérification : ${file.name}`,index,total,5);
-    if(await testPlayable(file)){show(`Compatible directement : ${file.name}`,index,total,100);return {status:'native'}}
-
-    const promise=(async()=>{
-      let out=await convert(file,'remux',p=>show(`Adaptation rapide : ${file.name} · ${p}%`,index,total,p));
-      if(out&&await testPlayable(out)){await putCached(file,out);return {status:'remux'}}
-
-      out=await convert(file,'transcode',p=>show(`Conversion MP4 : ${file.name} · ${p}%`,index,total,p));
-      if(out&&await testPlayable(out)){await putCached(file,out);return {status:'transcoded'}}
-      return {status:'failed'};
-    })();
-    jobs.set(fp(file),promise);
-    try{return await promise}finally{jobs.delete(fp(file))}
-  }
-
-  async function start(fileList){
-    const token=++runToken,files=await referencedVideos(fileList);
-    if(token!==runToken)return;
-    const total=files.length;
-    if(!total){done('Aucune vidéo UltraStar à préparer.',0);return}
-    let converted=0,native=0,cachedCount=0,failed=0;
-    show(`Analyse de ${total} vidéo${total>1?'s':''}…`,0,total,0);
-    for(let i=0;i<files.length;i++){
-      if(token!==runToken)return;
-      const r=await prepareOne(files[i],i+1,total,token);
-      if(r?.status==='native')native++;
-      else if(r?.status==='cached')cachedCount++;
-      else if(r?.status==='remux'||r?.status==='transcoded')converted++;
-      else if(r?.status==='failed')failed++;
-      await sleep(50);
-    }
-    if(worker){try{worker.terminate()}catch(e){}worker=null}
-    const parts=[`${native} déjà compatible${native>1?'s':''}`,`${converted} préparée${converted>1?'s':''}`,`${cachedCount} déjà en cache`];
-    if(failed)parts.push(`${failed} échec${failed>1?'s':''}`);
-    done(`Préparation terminée · ${parts.join(' · ')}`,total);
-  }
-
-  const oldSet=window.setUltraStarStageVideo;
-  if(typeof oldSet==='function'){
-    window.setUltraStarStageVideo=function(track){
-      const file=track?.compatVideoBlob||track?.videoBlob;
-      const pending=file?jobs.get(fp(file)):null;
-      if(pending){
-        const s=$('state');if(s)s.textContent='🎬 Vidéo en cours de préparation…';
-        pending.finally(()=>oldSet(track));
-        return;
-      }
-      return oldSet(track);
-    };
-  }
-
-  const folder=$('ultraStarFolder');
-  if(folder)folder.addEventListener('change',e=>start(e.target.files));
-
-  window.KaraokeWorldVideoPreconvert={
-    version:'0.26.1',
-    waitForFile:file=>jobs.get(fp(file))||Promise.resolve(),
-    isPreparing:file=>jobs.has(fp(file))
-  };
+const CACHE='karaokeworld-converted-video-v1',WORKER='./video-compat-worker-v0260.js',RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
+const jobs=new Map(),active=new Map();let token=0,total=0,done=0;
+const $=id=>document.getElementById(id),key=f=>[f?.name||'video',f?.size||0,f?.lastModified||0].join('|'),limit=n=>Math.max(1,Math.min(4,parseInt(n,10)||2));
+const concurrency=()=>limit(localStorage.getItem('kw_video_concurrency')||2),setConcurrency=n=>localStorage.setItem('kw_video_concurrency',String(limit(n)));
+function ck(f){let h=2166136261,s=key(f);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href}
+async function cached(f){try{return !!(await(await caches.open(CACHE)).match(ck(f)))}catch(e){return false}}
+async function cache(f,b){try{await(await caches.open(CACHE)).put(ck(f),new Response(b,{headers:{'Content-Type':'video/mp4'}}))}catch(e){}}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function box(){let b=$('ultraStarPreconvert');if(b)return b;const p=$('ultrastarPanel');if(!p)return null;b=document.createElement('div');b.id='ultraStarPreconvert';b.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a;display:none';b.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px"><b>🎬 Préparation automatique des vidéos</b><span id="ultraStarPreconvertCount" class="status">0/0</span></div><div id="ultraStarPreconvertText" class="muted" style="margin-top:6px"></div><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:8px"><i id="ultraStarPreconvertBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#34d399,#56dfff)"></i></div><div id="ultraStarPreconvertActive" style="display:grid;gap:5px;margin-top:8px"></div>';p.appendChild(b);return b}
+function paint(text=''){const b=box();if(b)b.style.display='block';if($('ultraStarPreconvertCount'))$('ultraStarPreconvertCount').textContent=`${done}/${total}`;if(text&&$('ultraStarPreconvertText'))$('ultraStarPreconvertText').textContent=text;if($('ultraStarPreconvertBar'))$('ultraStarPreconvertBar').style.width=`${total?Math.round(done/total*100):100}%`;if($('ultraStarPreconvertActive'))$('ultraStarPreconvertActive').innerHTML=[...active.values()].map(x=>`<div style="padding:6px 8px;border:1px solid #1c334d;border-radius:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span><b>${x.p}%</b></div><div class="muted" style="font-size:11px">${esc(x.label)}</div></div>`).join('')}
+function progress(f,label,p){active.set(key(f),{name:f.name,label,p:Math.max(0,Math.min(100,Math.round(p||0)))});paint()}
+function settings(){if($('videoConcurrency'))return;const s=$('settings');if(!s)return;const d=document.createElement('div');d.innerHTML='<hr><h3>🎬 Conversion vidéo UltraStar</h3><p class="muted">Nombre de vidéos incompatibles préparées en même temps. 2 est recommandé.</p><div class="controls wrap" style="justify-content:flex-start"><label for="videoConcurrency">Conversions simultanées</label><select id="videoConcurrency"><option value="1">1 · Économie</option><option value="2">2 · Recommandé</option><option value="3">3 · Rapide</option><option value="4">4 · Très rapide</option></select><span id="videoConcurrencyHint" class="status"></span></div>';s.appendChild(d);const sel=$('videoConcurrency'),hint=$('videoConcurrencyHint'),sync=()=>{sel.value=String(concurrency());hint.textContent=`${concurrency()} à la fois`};sel.onchange=()=>{setConcurrency(sel.value);sync()};sync()}
+function playable(blob,ms=3500){return new Promise(r=>{const v=document.createElement('video'),u=URL.createObjectURL(blob);let x=0;const end=ok=>{if(x)return;x=1;clearTimeout(t);v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(u);r(ok)},t=setTimeout(()=>end(v.readyState>=1),ms);v.preload='metadata';v.muted=true;v.onloadedmetadata=()=>end(true);v.oncanplay=()=>end(true);v.onerror=()=>end(false);v.src=u;v.load()})}
+async function convert(f,mode,cb){const w=new Worker(WORKER),job='pre-'+Date.now()+'-'+Math.random(),buf=await f.arrayBuffer();return new Promise(r=>{let x=0;const end=v=>{if(x)return;x=1;try{w.terminate()}catch(e){}r(v)};w.onmessage=e=>{const d=e.data||{};if(d.job!==job)return;if(d.type==='progress')cb(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));else if(d.type==='done')end(new Blob([d.buffer],{type:'video/mp4'}));else if(d.type==='error')end(null)};w.onerror=()=>end(null);w.postMessage({type:'convert',job,name:f.name,mode,buffer:buf},[buf])})}
+async function videos(list){const fs=[...list],txt=fs.filter(f=>/\.txt$/i.test(f.name)),out=[];for(const tf of txt)try{const meta={},text=await tf.text();for(const l of text.split(/\r?\n/))if(l[0]==='#'&&l.includes(':')){const i=l.indexOf(':');meta[l.slice(1,i).toUpperCase()]=l.slice(i+1).trim()}const dir=(tf.webkitRelativePath||tf.name).split('/').slice(0,-1).join('/'),wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop(),same=f=>(f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir,c=(wanted&&fs.find(f=>same(f)&&f.name.toLowerCase()===wanted.toLowerCase()))||fs.find(f=>same(f)&&RX.test(f.name));if(c)out.push(c)}catch(e){}const m=new Map;out.forEach(f=>m.set(key(f),f));return[...m.values()]}
+async function one(f,t){if(t!==token)return{status:'cancel'};progress(f,'Vérification…',4);if(await cached(f)){progress(f,'Déjà en cache',100);return{status:'cached'}}if(await playable(f)){progress(f,'Compatible directement',100);return{status:'native'}}let b=await convert(f,'remux',p=>progress(f,'Adaptation rapide…',p));if(b&&await playable(b)){await cache(f,b);progress(f,'Adaptée ✓',100);return{status:'converted'}}if(t!==token)return{status:'cancel'};b=await convert(f,'transcode',p=>progress(f,'Conversion MP4 H.264/AAC…',p));if(b&&await playable(b)){await cache(f,b);progress(f,'Convertie ✓',100);return{status:'converted'}}progress(f,'Échec automatique',100);return{status:'failed'}}
+async function start(list){const t=++token,fs=await videos(list);if(t!==token)return;total=fs.length;done=0;active.clear();if(!total){paint('Aucune vidéo UltraStar à préparer.');return}const n=concurrency(),stats={native:0,cached:0,converted:0,failed:0};paint(`Analyse de ${total} vidéo${total>1?'s':''} · ${n} conversion${n>1?'s':''} simultanée${n>1?'s':''}`);let next=0;const entries=fs.map(f=>{let resolve;const promise=new Promise(r=>resolve=r);jobs.set(key(f),promise);return{f,resolve}});async function runner(){while(t===token){const i=next++;if(i>=entries.length)return;const e=entries[i];let r;try{r=await one(e.f,t)}catch(err){console.error(err);r={status:'failed'}}if(stats[r?.status]!==undefined)stats[r.status]++;done++;e.resolve(r);jobs.delete(key(e.f));setTimeout(()=>{active.delete(key(e.f));paint()},700);paint(`Préparation en cours · ${done}/${total} terminée${done>1?'s':''}`)}}await Promise.all(Array.from({length:Math.min(n,total)},runner));if(t!==token)return;active.clear();paint(`Terminé · ${stats.native} compatible${stats.native>1?'s':''} · ${stats.converted} préparée${stats.converted>1?'s':''} · ${stats.cached} en cache${stats.failed?` · ${stats.failed} échec${stats.failed>1?'s':''}`:''}`)}
+const old=window.setUltraStarStageVideo;if(typeof old==='function')window.setUltraStarStageVideo=function(track){const f=track?.compatVideoBlob||track?.videoBlob,p=f&&jobs.get(key(f));if(p){if($('state'))$('state').textContent='🎬 Vidéo en cours de préparation…';p.finally(()=>old(track));return}return old(track)};
+settings();document.addEventListener('DOMContentLoaded',settings,{once:true});const f=$('ultraStarFolder');if(f)f.addEventListener('change',e=>start(e.target.files));const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.26.2 · UltraStar 🎤';
+window.KaraokeWorldVideoPreconvert={version:'0.26.2',getConcurrency:concurrency,setConcurrency,waitForFile:f=>jobs.get(key(f))||Promise.resolve(),isPreparing:f=>jobs.has(key(f))};
 })();
