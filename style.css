@@ -344,3 +344,22 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 #karaokeStage:-webkit-full-screen .stage-lyrics-wrap{
   z-index:4 !important;
 }
+
+/* v0.24.0 — une seule source d'affichage UltraStar
+   #stageLyrics affiche uniquement précédente / actuelle / suivante.
+   L'ancien panneau #lyrics ne doit pas afficher une deuxième copie derrière/en dessous. */
+#lyrics.ultrastar-hidden{
+  display:none !important;
+}
+#karaokeStage:has(#stageLyrics .us-stage) #lyrics{
+  display:none !important;
+}
+#stageLyrics .us-stage.singing-view .us-line.previous,
+#stageLyrics .us-stage.singing-view .us-line.current,
+#stageLyrics .us-stage.singing-view .us-line.next{
+  display:block !important;
+}
+/* Aucun autre bloc UltraStar compact ne doit apparaître dans le lecteur. */
+#karaokeStage .us-compact{
+  display:none !important;
+}
