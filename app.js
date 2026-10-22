@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.25.1";
+const APP_VERSION="0.25.2";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -466,11 +466,14 @@ let ultraStarVisualIdx=-999;
 
 function ultraStarLineHTML(group,sec,role){
   if(!group)return `<div class="us-line ${role||""} empty" aria-hidden="true">&nbsp;</div>`;
+  const raw=(group.syllables||[]).map(x=>x.text||"").join("");
+  const len=[...raw].length;
+  const sizeClass=len>=72?"us-xxlong":len>=54?"us-xlong":len>=38?"us-long":"";
   const syl=(group.syllables||[]).map(x=>{
     const txt=ultraStarEsc(x.text).replace(/ /g,"&nbsp;");
     return `<span class="us-syl" data-us-start="${x.start_s}" data-us-end="${x.end_s}">${txt}</span>`;
   }).join("");
-  return `<div class="us-line ${role||""}">${syl||"♪"}</div>`;
+  return `<div class="us-line ${role||""} ${sizeClass}" data-us-chars="${len}">${syl||"♪"}</div>`;
 }
 
 function ultraStarPaint(sec){

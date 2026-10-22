@@ -472,3 +472,75 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
   z-index:4!important;
   background:rgba(3,8,15,.30)!important;
 }
+
+/* v0.25.2 — longues phrases : zéro saut de mise en page
+   Une phrase peut occuper 1, 2 ou 3 lignes sans sortir de sa zone.
+   La taille s'adapte AVANT son affichage, donc pas de reflow brutal pendant le chant. */
+#lyrics .us-line,
+#stageLyrics .us-line{
+  box-sizing:border-box!important;
+  max-width:min(96%,1500px)!important;
+  white-space:normal!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+  text-wrap:balance!important;
+  line-height:1.10!important;
+  contain:layout style!important;
+}
+#lyrics .us-line.current,
+#stageLyrics .us-line.current{
+  font-size:clamp(1.35rem,3.35vw,3.65rem)!important;
+}
+#lyrics .us-line.current.us-long,
+#stageLyrics .us-line.current.us-long{
+  font-size:clamp(1.18rem,2.75vw,3.05rem)!important;
+}
+#lyrics .us-line.current.us-xlong,
+#stageLyrics .us-line.current.us-xlong{
+  font-size:clamp(1.02rem,2.25vw,2.55rem)!important;
+}
+#lyrics .us-line.current.us-xxlong,
+#stageLyrics .us-line.current.us-xxlong{
+  font-size:clamp(.90rem,1.82vw,2.10rem)!important;
+}
+#lyrics .us-line.previous.us-long,#lyrics .us-line.next.us-long,
+#stageLyrics .us-line.previous.us-long,#stageLyrics .us-line.next.us-long{
+  font-size:clamp(.85rem,1.75vw,1.75rem)!important;
+}
+#lyrics .us-line.previous.us-xlong,#lyrics .us-line.next.us-xlong,
+#lyrics .us-line.previous.us-xxlong,#lyrics .us-line.next.us-xxlong,
+#stageLyrics .us-line.previous.us-xlong,#stageLyrics .us-line.next.us-xlong,
+#stageLyrics .us-line.previous.us-xxlong,#stageLyrics .us-line.next.us-xxlong{
+  font-size:clamp(.76rem,1.45vw,1.48rem)!important;
+}
+
+/* Trois zones fixes : une phrase longue ne pousse plus les deux autres. */
+#lyrics .us-stage.singing-view,
+#stageLyrics .us-stage.singing-view{
+  grid-template-rows:minmax(0,1fr) minmax(0,1.45fr) minmax(0,1fr)!important;
+  overflow:hidden!important;
+}
+#lyrics .us-line.previous,#lyrics .us-line.current,#lyrics .us-line.next,
+#stageLyrics .us-line.previous,#stageLyrics .us-line.current,#stageLyrics .us-line.next{
+  max-height:100%!important;
+  overflow:hidden!important;
+  display:flex!important;
+  flex-wrap:wrap!important;
+  justify-content:center!important;
+  align-content:center!important;
+  align-items:center!important;
+}
+
+/* Le mouvement reste fluide, mais on ne translate plus tout le bloc en fonction
+   de la hauteur de la phrase : c'était la source principale des "sauts". */
+#stageLyrics .us-stage.us-slide-in,
+#lyrics .us-stage.us-slide-in{
+  transform:none!important;
+  opacity:.72;
+}
+#stageLyrics .us-stage.us-slide-in.us-slide-go,
+#lyrics .us-stage.us-slide-in.us-slide-go{
+  transform:none!important;
+  opacity:1;
+  transition:opacity 360ms ease-out!important;
+}
