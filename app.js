@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.4";
+const APP_VERSION="0.23.5";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -441,7 +441,9 @@ function renderUltraStarStage(sec){
   let activeIdx=-1, nextIdx=-1;
   for(let i=0;i<ultraStarGroups.length;i++){
     const g=ultraStarGroups[i];
-    if(sec>=g.start_s && sec<=g.end_s+0.08){activeIdx=i;break}
+    const following=ultraStarGroups[i+1];
+    const visualEnd=following ? Math.max(g.end_s, following.start_s-0.02) : g.end_s+0.12;
+    if(sec>=g.start_s && sec<=visualEnd){activeIdx=i;break}
     if(sec<g.start_s){nextIdx=i;break}
   }
   if(activeIdx>=0)nextIdx=activeIdx+1<ultraStarGroups.length?activeIdx+1:-1;

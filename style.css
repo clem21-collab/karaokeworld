@@ -119,3 +119,16 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 .us-line{white-space:normal;word-spacing:.08em}
 .us-syl{white-space:nowrap}
 .us-line.current,.us-line.next{overflow-wrap:normal;word-break:normal}
+
+/* v0.23.5 — scène UltraStar stable et centrée */
+#stageLyrics:has(.us-stage){box-sizing:border-box;display:block;height:clamp(320px,58vh,680px);min-height:320px;overflow:hidden}
+.us-stage{box-sizing:border-box;width:100%;height:100%;min-height:0;display:grid;grid-template-rows:1fr 1fr;align-items:center;justify-items:center;gap:0;padding:clamp(.5rem,2vh,1.25rem) clamp(.75rem,3vw,2rem);overflow:hidden}
+.us-stage .us-line{box-sizing:border-box;width:min(1200px,96%);height:100%;min-height:0;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;align-items:center;text-align:center;line-height:1.12;overflow:hidden}
+.us-stage .us-line.current{grid-row:1;font-size:clamp(1.55rem,4vw,4rem)}
+.us-stage .us-line.next{grid-row:2;font-size:clamp(1.1rem,2.5vw,2.15rem);margin:0}
+.us-syl.singing{transform:none}
+.us-stage .us-instrumental,.us-stage .us-count,.us-stage .us-hint{grid-column:1;justify-self:center;align-self:center;text-align:center}
+.us-stage .us-instrumental,.us-stage .us-hint{grid-row:1}
+.us-stage .us-count{grid-row:1}
+.us-stage > .us-line.next:last-child{grid-row:2}
+@media(max-width:700px){#stageLyrics:has(.us-stage){height:50vh;min-height:270px}.us-stage .us-line.current{font-size:clamp(1.25rem,5.5vw,2.4rem)}.us-stage .us-line.next{font-size:clamp(.95rem,4vw,1.5rem)}}
