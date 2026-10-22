@@ -132,3 +132,71 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 .us-stage .us-count{grid-row:1}
 .us-stage > .us-line.next:last-child{grid-row:2}
 @media(max-width:700px){#stageLyrics:has(.us-stage){height:50vh;min-height:270px}.us-stage .us-line.current{font-size:clamp(1.25rem,5.5vw,2.4rem)}.us-stage .us-line.next{font-size:clamp(.95rem,4vw,1.5rem)}}
+
+/* v0.23.6 — correctif plein écran UltraStar */
+:fullscreen #stage,
+:-webkit-full-screen #stage{
+  position:relative;
+  overflow:hidden;
+}
+:fullscreen #stageLyrics,
+:-webkit-full-screen #stageLyrics{
+  position:absolute !important;
+  inset:8vh 3vw 13vh 3vw !important;
+  width:auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+  z-index:50 !important;
+  pointer-events:none;
+  background:transparent !important;
+}
+:fullscreen #stageLyrics .us-stage,
+:-webkit-full-screen #stageLyrics .us-stage{
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:visible !important;
+  position:relative;
+  z-index:51;
+  background:transparent !important;
+}
+:fullscreen #stageLyrics .us-line,
+:-webkit-full-screen #stageLyrics .us-line{
+  overflow:visible !important;
+  max-height:none !important;
+  position:relative;
+  z-index:52;
+}
+:fullscreen #stageLyrics .us-count,
+:-webkit-full-screen #stageLyrics .us-count,
+:fullscreen #stageLyrics .us-instrumental,
+:-webkit-full-screen #stageLyrics .us-instrumental,
+:fullscreen #stageLyrics .us-hint,
+:-webkit-full-screen #stageLyrics .us-hint{
+  position:relative !important;
+  z-index:60 !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+:fullscreen #stageControls,
+:-webkit-full-screen #stageControls{
+  position:absolute;
+  left:3vw; right:3vw; bottom:2vh;
+  z-index:80;
+}
+/* Les éventuels fonds/overlays du stage restent derrière les paroles. */
+:fullscreen #stage::before,
+:fullscreen #stage::after,
+:-webkit-full-screen #stage::before,
+:-webkit-full-screen #stage::after{
+  z-index:0 !important;
+  pointer-events:none;
+}
+@media (orientation:landscape){
+  :fullscreen #stageLyrics,
+  :-webkit-full-screen #stageLyrics{inset:6vh 3vw 12vh 3vw !important}
+}
