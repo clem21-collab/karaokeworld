@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.24.0";
+const APP_VERSION="0.24.1";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -354,7 +354,7 @@ $("searchLyrics").onclick=searchOnlineLyrics;$("lyricsQuery").addEventListener("
 let youtubeHome=null;
 function updateStageOffset(){if($("stageOffset"))$("stageOffset").textContent='Synchro '+(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s'}
 function stageSongMeta(){let title=currentYoutubeTitle||'',artist=currentYoutubeChannel||'';if(currentId){const t=tracks.find(x=>x.id===currentId);if(t){title=t.title;artist=t.artist}}$("stageSongTitle").textContent=cleanYoutubeTitle(title)||'KaraokeWorld';$("stageSongArtist").textContent=cleanYoutubeTitle(artist)||'Prêt à chanter 🎤';clearTimeout(stageInfoTimer);$("stageSongInfo").classList.remove('fade');stageInfoTimer=setTimeout(()=>$("stageSongInfo")?.classList.add('fade'),5500)}
-async function enterKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(!stage)return;if(yp&&!yp.classList.contains('hidden')){youtubeHome={parent:yp.parentNode,next:yp.nextSibling};$("stageVideoSlot").appendChild(yp)}if(currentYoutubeId)$("stageBg").style.backgroundImage=`url(https://i.ytimg.com/vi/${currentYoutubeId}/hqdefault.jpg)`;else $("stageBg").style.backgroundImage='';stage.classList.remove('hidden');stage.setAttribute('aria-hidden','false');stageLastIdx=-999;renderStageLyrics(-1,0);updateStageOffset();stageSongMeta();try{if(stage.requestFullscreen)await stage.requestFullscreen()}catch(e){}}
+async function enterKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(!stage)return;if(yp&&!yp.classList.contains('hidden')){youtubeHome={parent:yp.parentNode,next:yp.nextSibling};$("stageVideoSlot").appendChild(yp)}if(currentYoutubeId)$("stageBg").style.backgroundImage=`url(https://i.ytimg.com/vi/${currentYoutubeId}/hqdefault.jpg)`;else $("stageBg").style.backgroundImage='';stage.classList.remove('hidden');stage.setAttribute('aria-hidden','false');stageLastIdx=-999;if(ultraStarCurrentId){ultraStarVisualIdx=-999;renderUltraStarStage($("audio")?.currentTime||0)}else{renderStageLyrics(-1,0)}updateStageOffset();stageSongMeta();try{if(stage.requestFullscreen)await stage.requestFullscreen()}catch(e){}}
 function exitKaraokeStage(){const stage=$("karaokeStage"),yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}stage.classList.add('hidden');stage.setAttribute('aria-hidden','true');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
 async function stageCountdownPlay(){if(countdownRunning)return;if(!$("stageCountdownEnabled").checked){$("play").click();return}countdownRunning=true;const c=$("stageCountdown");c.classList.remove('hidden');for(const v of ['3','2','1','🎤']){c.textContent=v;await new Promise(r=>setTimeout(r,v==='🎤'?450:700))}c.classList.add('hidden');countdownRunning=false;$("play").click()}
 function seekRelative(delta){try{if(ytPlayer&&typeof ytPlayer.getCurrentTime==='function'){ytPlayer.seekTo(Math.max(0,(ytPlayer.getCurrentTime()||0)+delta),true);return}}catch(e){}const m=$("video").classList.contains("hidden")?$("audio"):$("video");if(m.duration)m.currentTime=Math.max(0,Math.min(m.duration,m.currentTime+delta))}
@@ -443,50 +443,54 @@ function ultraStarPaint(sec){
   });
 }
 
-/* Affichage stable :
-   - la phrase précédente reste au-dessus ;
-   - la phrase actuelle reste au centre jusqu'au démarrage de la suivante ;
-   - la prochaine reste en dessous ;
-   - le DOM n'est reconstruit que lors d'un vrai changement de phrase. */
+function ultraStarThreeLinesHTML(idx,sec,extraClass="singing-view"){
+  const prev=idx>0?ultraStarGroups[idx-1]:null;
+  const current=ultraStarGroups[idx]||null;
+  const next=idx+1<ultraStarGroups.length?ultraStarGroups[idx+1]:null;
+  return `<div class="us-stage ${extraClass}">
+    ${ultraStarLineHTML(prev,sec,"previous")}
+    ${ultraStarLineHTML(current,sec,"current")}
+    ${ultraStarLineHTML(next,sec,"next")}
+  </div>`;
+}
+
 function renderUltraStarStage(sec){
-  const box=$("stageLyrics"), normal=$("lyrics");
-  if(!box||!ultraStarGroups.length)return;
+  const stageBox=$("stageLyrics"), normal=$("lyrics");
+  if(!stageBox||!normal||!ultraStarGroups.length)return;
+
+  // Important: #lyrics is the NORMAL player. It must stay visible.
+  normal.classList.remove("ultrastar-hidden");
 
   const first=ultraStarGroups[0];
   if(sec<first.start_s){
     const wait=Math.max(0,first.start_s-sec);
     if(ultraStarVisualIdx!==-1){
-      box.innerHTML=`<div class="us-stage intro">
+      const intro=`<div class="us-stage intro">
         <div class="us-hint">Préparez-vous…</div>
         <div class="us-count">${Math.max(1,Math.ceil(wait))}</div>
         ${ultraStarLineHTML(first,sec,"next")}
       </div>`;
-      if(normal){normal.innerHTML="";normal.classList.add("ultrastar-hidden");}
+      stageBox.innerHTML=intro;
+      normal.innerHTML=intro;
       ultraStarVisualIdx=-1;
     }else{
-      const count=box.querySelector(".us-count");
-      if(count)count.textContent=String(Math.max(1,Math.ceil(wait)));
+      document.querySelectorAll("#stageLyrics .us-count,#lyrics .us-count").forEach(
+        el=>el.textContent=String(Math.max(1,Math.ceil(wait)))
+      );
     }
     return;
   }
 
-  // La ligne courante est la dernière dont le début a été atteint.
-  // Elle ne disparaît donc jamais pendant une pause entre deux phrases.
   let idx=0;
   for(let i=1;i<ultraStarGroups.length;i++){
-    if(sec>=ultraStarGroups[i].start_s)idx=i; else break;
+    if(sec>=ultraStarGroups[i].start_s)idx=i;else break;
   }
 
   if(idx!==ultraStarVisualIdx){
-    const prev=idx>0?ultraStarGroups[idx-1]:null;
-    const current=ultraStarGroups[idx];
-    const next=idx+1<ultraStarGroups.length?ultraStarGroups[idx+1]:null;
-    box.innerHTML=`<div class="us-stage singing-view">
-      ${ultraStarLineHTML(prev,sec,"previous")}
-      ${ultraStarLineHTML(current,sec,"current")}
-      ${ultraStarLineHTML(next,sec,"next")}
-    </div>`;
-    if(normal){normal.innerHTML="";normal.classList.add("ultrastar-hidden");}
+    // EXACTEMENT trois emplacements, dans les deux vues.
+    const html=ultraStarThreeLinesHTML(idx,sec);
+    stageBox.innerHTML=html;
+    normal.innerHTML=html;
     ultraStarVisualIdx=idx;
   }
   ultraStarPaint(sec);

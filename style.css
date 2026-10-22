@@ -345,21 +345,48 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
   z-index:4 !important;
 }
 
-/* v0.24.0 — une seule source d'affichage UltraStar
-   #stageLyrics affiche uniquement précédente / actuelle / suivante.
-   L'ancien panneau #lyrics ne doit pas afficher une deuxième copie derrière/en dessous. */
-#lyrics.ultrastar-hidden{
-  display:none !important;
+/* v0.24.1 — séparation propre vue normale / scène plein écran */
+
+/* En vue normale, #lyrics affiche uniquement les 3 lignes UltraStar. */
+#lyrics .us-stage{
+  width:100% !important;
+  min-height:250px !important;
+  height:auto !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:1fr auto 1fr !important;
+  align-items:center !important;
+  justify-items:center !important;
+  gap:.55rem !important;
+  padding:1rem !important;
 }
-#karaokeStage:has(#stageLyrics .us-stage) #lyrics{
-  display:none !important;
+#lyrics .us-line{
+  width:100% !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:.08em .2em !important;
+  overflow:visible !important;
+  text-align:center !important;
+  line-height:1.16 !important;
 }
-#stageLyrics .us-stage.singing-view .us-line.previous,
-#stageLyrics .us-stage.singing-view .us-line.current,
-#stageLyrics .us-stage.singing-view .us-line.next{
-  display:block !important;
+#lyrics .us-line.previous{grid-row:1!important;align-self:end!important;font-size:.78em!important;opacity:.58!important}
+#lyrics .us-line.current{grid-row:2!important;align-self:center!important;font-size:1em!important;opacity:1!important}
+#lyrics .us-line.next{grid-row:3!important;align-self:start!important;font-size:.78em!important;opacity:.72!important}
+#lyrics .us-line.empty{visibility:hidden!important}
+
+/* Dans la scène karaoké, seule #stageLyrics est la source des paroles UltraStar.
+   L'ancien renderer LRC n'est plus appelé à l'ouverture du plein écran. */
+#stageLyrics .us-stage.singing-view{
+  width:100%!important;
+  height:100%!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:1fr auto 1fr!important;
+  align-items:center!important;
+  justify-items:center!important;
+  gap:clamp(.5rem,1.5vh,1rem)!important;
 }
-/* Aucun autre bloc UltraStar compact ne doit apparaître dans le lecteur. */
-#karaokeStage .us-compact{
-  display:none !important;
-}
+#stageLyrics .us-stage.singing-view .us-line.previous{grid-row:1!important;align-self:end!important}
+#stageLyrics .us-stage.singing-view .us-line.current{grid-row:2!important;align-self:center!important}
+#stageLyrics .us-stage.singing-view .us-line.next{grid-row:3!important;align-self:start!important}
+#stageLyrics .us-stage.singing-view .us-line.empty{visibility:hidden!important}
