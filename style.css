@@ -182,3 +182,72 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
 #karaokeStage:-webkit-full-screen .us-line.next{
  width:min(1100px,96%)!important;font-size:clamp(1.15rem,2.25vw,2.1rem)!important;line-height:1.16!important
 }
+
+/* v0.23.8 — centrage réel des paroles + aucun compte à rebours entre les phrases */
+
+/* En chant normal, les deux phrases forment un bloc centré au milieu de l'écran. */
+.us-stage:not(.intro):not(.instrumental){
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+  align-items:center !important;
+  align-content:center !important;
+  gap:clamp(.65rem,2vh,1.35rem) !important;
+  padding:0 clamp(.8rem,3vw,2rem) !important;
+}
+.us-stage:not(.intro):not(.instrumental) .us-line{
+  flex:none !important;
+  height:auto !important;
+  min-height:0 !important;
+  width:min(1200px,96%) !important;
+  margin:0 auto !important;
+  align-content:center !important;
+  justify-content:center !important;
+  text-align:center !important;
+}
+
+/* Pendant un instrumental, on garde seulement le texte instrumental + prochaine phrase,
+   sans aucun chiffre de compte à rebours. */
+.us-stage.instrumental{
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+  align-items:center !important;
+  gap:clamp(1rem,3vh,2rem) !important;
+}
+.us-stage.instrumental .us-instrumental,
+.us-stage.instrumental .us-line.next{
+  flex:none !important;
+  height:auto !important;
+  margin:0 auto !important;
+  text-align:center !important;
+}
+
+/* En plein écran : la zone elle-même couvre tout l'espace et le bloc reste au centre exact. */
+#karaokeStage:fullscreen #stageLyrics,
+#karaokeStage:-webkit-full-screen #stageLyrics{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:clamp(60px,8vh,90px) clamp(20px,3vw,55px) clamp(45px,6vh,70px) !important;
+}
+#karaokeStage:fullscreen #stageLyrics .us-stage,
+#karaokeStage:-webkit-full-screen #stageLyrics .us-stage{
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+}
+
+/* Le compte à rebours d'introduction reste centré. */
+.us-stage.intro{
+  width:100% !important;
+  height:100% !important;
+  align-items:center !important;
+  justify-items:center !important;
+}
+.us-stage.intro .us-count{
+  justify-self:center !important;
+  align-self:center !important;
+  text-align:center !important;
+}

@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.7";
+const APP_VERSION="0.23.8";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -462,7 +462,7 @@ function renderUltraStarStage(sec){
     const isIntro=nextIdx===0;
     box.innerHTML=`<div class="us-stage ${isIntro?"intro":"instrumental"}">
       ${isIntro?'<div class="us-hint">Préparez-vous…</div>':'<div class="us-instrumental">♪ Instrumental ♪</div>'}
-      ${(isIntro||wait<=5)?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
+      ${isIntro?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
       ${ultraStarLineHTML(next,sec,"next")}
     </div>`;
     if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(next,sec,"next")}</div>`;
