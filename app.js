@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.8";
+const APP_VERSION="0.23.9";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -419,60 +419,81 @@ playTrack=function(id){
   currentId=id;lrc=t.lrc||[];ultraStarGroups=t.ultraStar?.groups||[];ultraStarCurrentId=id;
   $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s`;
   $("audio").pause();$("video").pause();$("video").classList.add("hidden");$("audio").classList.remove("hidden");
-  $("audio").src=t.url;$("audio").play().catch(()=>{});stageLastIdx=-999;renderUltraStarStage(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
+  $("audio").src=t.url;$("audio").play().catch(()=>{});stageLastIdx=-999;ultraStarVisualIdx=-999;renderUltraStarStage(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
   cancelAnimationFrame(ultraStarRaf);ultraStarTick();
 }
 function ultraStarEsc(s){return esc(s||"")}
+function ultraStarEsc(s){return esc(s||"")}
+let ultraStarVisualIdx=-999;
+
 function ultraStarLineHTML(group,sec,role){
-  if(!group)return "";
-  const syl=group.syllables||[];
-  const words=syl.map(x=>{
-    const done=sec>=x.end_s, active=sec>=x.start_s&&sec<x.end_s;
-    const pct=active?Math.max(0,Math.min(100,(sec-x.start_s)/Math.max(.04,x.end_s-x.start_s)*100)):(done?100:0);
+  if(!group)return `<div class="us-line ${role||""} empty" aria-hidden="true">&nbsp;</div>`;
+  const syl=(group.syllables||[]).map(x=>{
     const txt=ultraStarEsc(x.text).replace(/ /g,"&nbsp;");
-    return `<span class="us-syl ${done?"done":""} ${active?"singing":""}" style="--us-progress:${pct.toFixed(1)}%">${txt}</span>`;
+    return `<span class="us-syl" data-us-start="${x.start_s}" data-us-end="${x.end_s}">${txt}</span>`;
   }).join("");
-  return `<div class="us-line ${role||""}">${words||"♪"}</div>`;
+  return `<div class="us-line ${role||""}">${syl||"♪"}</div>`;
 }
+
+function ultraStarPaint(sec){
+  document.querySelectorAll("#stageLyrics .us-line.current .us-syl, #lyrics .us-line.current .us-syl").forEach(el=>{
+    const s=Number(el.dataset.usStart), e=Number(el.dataset.usEnd);
+    el.classList.toggle("done",sec>=e);
+    el.classList.toggle("singing",sec>=s&&sec<e);
+  });
+}
+
+/* Affichage stable :
+   - la phrase précédente reste au-dessus ;
+   - la phrase actuelle reste au centre jusqu'au démarrage de la suivante ;
+   - la prochaine reste en dessous ;
+   - le DOM n'est reconstruit que lors d'un vrai changement de phrase. */
 function renderUltraStarStage(sec){
   const box=$("stageLyrics"), normal=$("lyrics");
   if(!box||!ultraStarGroups.length)return;
 
-  let activeIdx=-1, nextIdx=-1;
-  for(let i=0;i<ultraStarGroups.length;i++){
-    const g=ultraStarGroups[i];
-    const following=ultraStarGroups[i+1];
-    const visualEnd=following ? Math.max(g.end_s, following.start_s-0.02) : g.end_s+0.12;
-    if(sec>=g.start_s && sec<=visualEnd){activeIdx=i;break}
-    if(sec<g.start_s){nextIdx=i;break}
-  }
-  if(activeIdx>=0)nextIdx=activeIdx+1<ultraStarGroups.length?activeIdx+1:-1;
-
-  const current=activeIdx>=0?ultraStarGroups[activeIdx]:null;
-  const next=nextIdx>=0?ultraStarGroups[nextIdx]:null;
-
-  if(current){
-    box.innerHTML=`<div class="us-stage">${ultraStarLineHTML(current,sec,"current")}${ultraStarLineHTML(next,sec,"next")}</div>`;
-    if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(current,sec,"current")}${ultraStarLineHTML(next,sec,"next")}</div>`;
+  const first=ultraStarGroups[0];
+  if(sec<first.start_s){
+    const wait=Math.max(0,first.start_s-sec);
+    if(ultraStarVisualIdx!==-1){
+      box.innerHTML=`<div class="us-stage intro">
+        <div class="us-hint">Préparez-vous…</div>
+        <div class="us-count">${Math.max(1,Math.ceil(wait))}</div>
+        ${ultraStarLineHTML(first,sec,"next")}
+      </div>`;
+      if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(first,sec,"next")}</div>`;
+      ultraStarVisualIdx=-1;
+    }else{
+      const count=box.querySelector(".us-count");
+      if(count)count.textContent=String(Math.max(1,Math.ceil(wait)));
+    }
     return;
   }
 
-  if(next){
-    const wait=Math.max(0,next.start_s-sec);
-    const isIntro=nextIdx===0;
-    box.innerHTML=`<div class="us-stage ${isIntro?"intro":"instrumental"}">
-      ${isIntro?'<div class="us-hint">Préparez-vous…</div>':'<div class="us-instrumental">♪ Instrumental ♪</div>'}
-      ${isIntro?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
+  // La ligne courante est la dernière dont le début a été atteint.
+  // Elle ne disparaît donc jamais pendant une pause entre deux phrases.
+  let idx=0;
+  for(let i=1;i<ultraStarGroups.length;i++){
+    if(sec>=ultraStarGroups[i].start_s)idx=i; else break;
+  }
+
+  if(idx!==ultraStarVisualIdx){
+    const prev=idx>0?ultraStarGroups[idx-1]:null;
+    const current=ultraStarGroups[idx];
+    const next=idx+1<ultraStarGroups.length?ultraStarGroups[idx+1]:null;
+    box.innerHTML=`<div class="us-stage singing-view">
+      ${ultraStarLineHTML(prev,sec,"previous")}
+      ${ultraStarLineHTML(current,sec,"current")}
       ${ultraStarLineHTML(next,sec,"next")}
     </div>`;
-    if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(next,sec,"next")}</div>`;
-    return;
+    if(normal)normal.innerHTML=`<div class="us-compact">
+      ${ultraStarLineHTML(prev,sec,"previous")}
+      ${ultraStarLineHTML(current,sec,"current")}
+      ${ultraStarLineHTML(next,sec,"next")}
+    </div>`;
+    ultraStarVisualIdx=idx;
   }
-
-  // Fin de chanson : conserver la dernière phrase au lieu d'afficher Instrumental indéfiniment.
-  const last=ultraStarGroups[ultraStarGroups.length-1];
-  box.innerHTML=`<div class="us-stage">${ultraStarLineHTML(last,sec,"current")}</div>`;
-  if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(last,sec,"current")}</div>`;
+  ultraStarPaint(sec);
 }
 function ultraStarTick(){
   if(!ultraStarCurrentId)return;

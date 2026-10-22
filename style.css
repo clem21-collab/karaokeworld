@@ -251,3 +251,96 @@ button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 0 18px rgba(181,
   align-self:center !important;
   text-align:center !important;
 }
+
+/* v0.23.9 — scène UltraStar stable à 3 lignes */
+#stageLyrics:has(.us-stage){
+  overflow:visible !important;
+}
+.us-stage.singing-view{
+  box-sizing:border-box !important;
+  width:100% !important;
+  height:100% !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:1fr auto 1fr !important;
+  align-items:center !important;
+  justify-items:center !important;
+  gap:clamp(.45rem,1.4vh,1rem) !important;
+  padding:clamp(1rem,3vh,2rem) clamp(1rem,3vw,2.5rem) !important;
+  overflow:visible !important;
+}
+.us-stage.singing-view .us-line{
+  width:min(1200px,96%) !important;
+  height:auto !important;
+  min-height:0 !important;
+  margin:0 auto !important;
+  padding:.08em .15em !important;
+  display:block !important;
+  overflow:visible !important;
+  text-align:center !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:normal !important;
+  line-height:1.14 !important;
+}
+.us-stage.singing-view .us-line.previous{
+  grid-row:1 !important;
+  align-self:end !important;
+  font-size:clamp(1.05rem,2.15vw,2rem) !important;
+  color:rgba(255,255,255,.43) !important;
+  opacity:.72 !important;
+}
+.us-stage.singing-view .us-line.current{
+  grid-row:2 !important;
+  align-self:center !important;
+  font-size:clamp(1.55rem,3.6vw,3.9rem) !important;
+  opacity:1 !important;
+}
+.us-stage.singing-view .us-line.next{
+  grid-row:3 !important;
+  align-self:start !important;
+  font-size:clamp(1.05rem,2.15vw,2rem) !important;
+  color:rgba(255,255,255,.60) !important;
+  opacity:.78 !important;
+}
+.us-stage.singing-view .us-line.empty{visibility:hidden !important}
+.us-stage.singing-view .us-line.previous .us-syl{
+  color:rgba(255,255,255,.43) !important;
+}
+.us-stage.singing-view .us-line.current .us-syl{
+  color:rgba(255,255,255,.62) !important;
+}
+.us-stage.singing-view .us-line.current .us-syl.done,
+.us-stage.singing-view .us-line.current .us-syl.singing{
+  color:#ffb12b !important;
+}
+.us-stage.singing-view .us-line.next .us-syl{
+  color:rgba(255,255,255,.60) !important;
+}
+
+/* Rien ne doit passer devant / couper la zone de paroles. */
+.stage-lyrics-wrap{overflow:visible !important}
+#karaokeStage:fullscreen .stage-lyrics-wrap,
+#karaokeStage:-webkit-full-screen .stage-lyrics-wrap{
+  overflow:visible !important;
+}
+#karaokeStage:fullscreen #stageLyrics,
+#karaokeStage:-webkit-full-screen #stageLyrics{
+  box-sizing:border-box !important;
+  overflow:visible !important;
+  padding:clamp(76px,10vh,110px) clamp(22px,3vw,56px) clamp(58px,8vh,90px) !important;
+}
+/* Le bandeau d'aide du bas pouvait visuellement empiéter sur les paroles. */
+#karaokeStage:fullscreen .stage-hint,
+#karaokeStage:-webkit-full-screen .stage-hint{
+  display:none !important;
+}
+/* Le panneau vidéo/commandes ne recouvre jamais la colonne paroles. */
+#karaokeStage:fullscreen .stage-video,
+#karaokeStage:-webkit-full-screen .stage-video{
+  z-index:3 !important;
+}
+#karaokeStage:fullscreen .stage-lyrics-wrap,
+#karaokeStage:-webkit-full-screen .stage-lyrics-wrap{
+  z-index:4 !important;
+}
