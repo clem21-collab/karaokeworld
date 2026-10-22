@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.22.0";
+const APP_VERSION="0.23.0";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -365,6 +365,80 @@ $("stageSeek").oninput=()=>{const pct=Number($("stageSeek").value)/100;try{if(yt
 document.querySelectorAll('.stage-layout').forEach(b=>b.onclick=()=>{const st=$("karaokeStage");st.classList.remove('layout-80','layout-100');if(b.dataset.layout==='80')st.classList.add('layout-80');if(b.dataset.layout==='100')st.classList.add('layout-100');document.querySelectorAll('.stage-layout').forEach(x=>x.classList.toggle('active',x===b))});
 document.addEventListener('keydown',e=>{const open=!$("karaokeStage").classList.contains('hidden');if(!open)return;if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;if(e.code==='Space'){e.preventDefault();let playing=false;try{playing=ytPlayer&&ytPlayer.getPlayerState&&ytPlayer.getPlayerState()===1}catch(_){}if(!ytPlayer){const m=$("video").classList.contains('hidden')?$("audio"):$("video");playing=!m.paused}playing?$("pause").click():stageCountdownPlay()}else if(e.key==='ArrowLeft'){e.preventDefault();seekRelative(-5)}else if(e.key==='ArrowRight'){e.preventDefault();seekRelative(5)}else if(e.key.toLowerCase()==='f'){e.preventDefault();if(!document.fullscreenElement)$("karaokeStage").requestFullscreen?.();else document.exitFullscreen?.()}else if(e.key==='Escape'){exitKaraokeStage()}});
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&!$("karaokeStage").classList.contains('hidden')){const yp=$("youtubePlayer");if(youtubeHome&&yp){youtubeHome.parent.insertBefore(yp,youtubeHome.next);youtubeHome=null}$("karaokeStage").classList.add('hidden');$("karaokeStage").setAttribute('aria-hidden','true')}});
+
+
+// === KaraokeWorld UltraStar engine v0.23.0 ===
+let ultraStarGroups=[], ultraStarRaf=0, ultraStarCurrentId=null;
+function usNorm(s){return String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
+function usDecode(buf){for(const enc of ["utf-8","windows-1252","iso-8859-1"]){try{return new TextDecoder(enc,{fatal:enc==="utf-8"}).decode(buf)}catch(e){}}return new TextDecoder().decode(buf)}
+function parseUltraStar(txt){
+  const meta={}, raw=[]; let cur=[];
+  const rx=/^([:*F])\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/;
+  for(let line of txt.split(/\r?\n/)){
+    line=line.trimEnd();
+    if(line.startsWith("#")&&line.includes(":")){const i=line.indexOf(":");meta[line.slice(1,i).toUpperCase()]=line.slice(i+1).trim();continue}
+    if(line.startsWith("-")){if(cur.length){raw.push(cur);cur=[]}continue}
+    if(line==="E"){if(cur.length)raw.push(cur);break}
+    const m=line.match(rx);if(m)cur.push({start:+m[2],dur:+m[3],pitch:+m[4],text:m[5]});
+  }
+  const bpm=parseFloat(String(meta.BPM||"").replace(",",".")), gap=parseFloat(String(meta.GAP||"").replace(",","."));
+  if(!bpm||!Number.isFinite(gap)||!raw.length)throw Error("TXT UltraStar invalide");
+  const beatMs=60000/(bpm*4);
+  const groups=raw.map(a=>{const syllables=a.map(n=>({...n,start_s:gap/1000+n.start*beatMs/1000,end_s:gap/1000+(n.start+n.dur)*beatMs/1000}));return{syllables,start_s:syllables[0].start_s,end_s:Math.max(...syllables.map(x=>x.end_s))}});
+  const lines=groups.map(g=>({time:g.start_s,text:g.syllables.map(x=>x.text).join("").trim()}));
+  return {meta,bpm,gap,groups,lines};
+}
+async function importUltraStarFolder(fileList){
+  const files=[...fileList], txts=files.filter(f=>/\.txt$/i.test(f.name));let added=0,missing=0,bad=0;
+  $("ultraStarStatus").textContent=`Analyse de ${txts.length} fichiers UltraStar…`;
+  for(const tf of txts){
+    try{
+      const us=parseUltraStar(usDecode(await tf.arrayBuffer()));
+      const dir=tf.webkitRelativePath.split("/").slice(0,-1).join("/");
+      const wanted=(us.meta.MP3||"").split(/[\\/]/).pop();
+      const audio=files.find(f=>f.webkitRelativePath===dir+"/"+wanted)||
+                  files.find(f=>f.webkitRelativePath.startsWith(dir+"/")&&/\.(mp3|ogg|m4a|wav)$/i.test(f.name));
+      if(!audio){missing++;continue}
+      const id="ultrastar_"+usNorm((us.meta.ARTIST||"")+"_"+(us.meta.TITLE||tf.name))+"_"+added;
+      const coverName=(us.meta.COVER||"").split(/[\\/]/).pop();
+      const cover=coverName?files.find(f=>f.webkitRelativePath===dir+"/"+coverName):null;
+      const t={id,title:us.meta.TITLE||tf.name.replace(/\.txt$/i,""),artist:us.meta.ARTIST||"Artiste inconnu",genre:us.meta.GENRE||"Sans genre",emoji:"🎤",kind:"ultrastar",type:"audio",blob:audio,url:URL.createObjectURL(audio),created:Date.now(),lrc:us.lines,ultraStar:{bpm:us.bpm,gap:us.gap,groups:us.groups},coverUrl:cover?URL.createObjectURL(cover):""};
+      // session import: exact File objects remain local and are not uploaded
+      tracks=tracks.filter(x=>!(x.kind==="ultrastar"&&usNorm(x.artist+"|"+x.title)===usNorm(t.artist+"|"+t.title)));
+      tracks.unshift(t);added++;
+    }catch(e){bad++}
+  }
+  drawTracks();drawPlaylists();
+  $("ultraStarBadge").textContent=`${added} prête${added!==1?"s":""}`;
+  $("ultraStarStatus").textContent=`✅ ${added} chansons exactes ajoutées à KaraokeWorld${missing?` · ${missing} sans audio correspondant`:""}${bad?` · ${bad} TXT non compatibles`:""}.`;
+}
+const originalPlayTrack=playTrack;
+playTrack=function(id){
+  const t=tracks.find(x=>x.id===id);
+  if(!t||t.kind!=="ultrastar"){ultraStarCurrentId=null;cancelAnimationFrame(ultraStarRaf);return originalPlayTrack(id)}
+  currentId=id;lrc=t.lrc||[];ultraStarGroups=t.ultraStar?.groups||[];ultraStarCurrentId=id;
+  $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s`;
+  $("audio").pause();$("video").pause();$("video").classList.add("hidden");$("audio").classList.remove("hidden");
+  $("audio").src=t.url;$("audio").play().catch(()=>{});renderLyrics(0);$("player").scrollIntoView({behavior:"smooth",block:"nearest"});
+  cancelAnimationFrame(ultraStarRaf);ultraStarTick();
+}
+function ultraStarTick(){
+  if(!ultraStarCurrentId)return;
+  const a=$("audio"),sec=a.currentTime||0;renderLyrics(sec);
+  // Preserve exact UltraStar line timing; the validated source remains BPM+GAP.
+  ultraStarRaf=requestAnimationFrame(ultraStarTick);
+}
+function openUltraStarCatalog(){
+  const term=($("query")?.value||"").trim(),p=new URLSearchParams();
+  if(term)p.set("busqueda",term);p.set("idioma","fr");
+  window.open("https://ultrastar-es.org/fr/canciones?"+p.toString(),"_blank","noopener");
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  const choose=()=>$("ultraStarFolder").click();
+  $("importUltraStar")?.addEventListener("click",choose);$("ultraStarChoose")?.addEventListener("click",choose);
+  $("ultraStarFolder")?.addEventListener("change",e=>importUltraStarFolder(e.target.files));
+  $("ultraStarCatalog")?.addEventListener("click",openUltraStarCatalog);
+});
 
 boot();
 
