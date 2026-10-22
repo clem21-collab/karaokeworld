@@ -1,0 +1,13 @@
+/* KaraokeWorld v0.26.0 — état de préparation/conversion vidéo */
+#stageVideoSlot{position:relative}
+.stage-video-compat{
+  position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;padding:20px;text-align:center;background:rgba(3,9,18,.88);border-radius:12px;color:#edf5ff;
+  backdrop-filter:blur(8px)
+}
+.stage-video-compat.hidden{display:none!important}
+.stage-video-compat b{font-size:15px}
+.stage-video-compat span{font-size:12px;color:#bed0e8;max-width:90%}
+.stage-video-compat-bar{width:min(82%,360px);height:7px;border-radius:20px;background:#142943;overflow:hidden;border:1px solid #244263}
+.stage-video-compat-bar i{display:block;width:12%;height:100%;border-radius:20px;background:linear-gradient(90deg,#a83ce8,#287bff,#59e2ff);transition:width .18s ease}
+#karaokeStage.layout-100 .stage-video-compat{display:none!important}
