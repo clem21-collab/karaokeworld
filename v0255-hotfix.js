@@ -26,3 +26,18 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
+
+// v0.26.1 — charge la préparation automatique des vidéos dès l'import UltraStar.
+(()=>{
+  function loadPreconvert(){
+    if(document.querySelector('script[data-kw-preconvert]'))return;
+    const s=document.createElement('script');
+    s.src='./video-preconvert-v0261.js';
+    s.async=false;
+    s.dataset.kwPreconvert='1';
+    document.body.appendChild(s);
+    const badge=document.querySelector('.brand small');
+    if(badge)badge.textContent=' BETA · v0.26.1 · UltraStar 🎤';
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadPreconvert);else loadPreconvert();
+})();
