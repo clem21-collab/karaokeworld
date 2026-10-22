@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.25.0";
+const APP_VERSION="0.25.1";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -384,6 +384,10 @@ function setUltraStarStageVideo(track){
   ultraStarVideoUrl=URL.createObjectURL(track.videoBlob);
   v.src=ultraStarVideoUrl;
   v.classList.remove("hidden");
+  v.onerror=()=>{
+    const st=$("state");
+    if(st)st.textContent=`Vidéo UltraStar non lisible directement (${track.videoName||"format/codec incompatible"}) · audio + paroles conservés`;
+  };
 }
 function syncUltraStarVideo(sec){
   const v=$("ultraStarStageVideo");if(!v||!ultraStarVideoUrl)return;
@@ -429,7 +433,12 @@ async function importUltraStarFolder(fileList){
       const id="ultrastar_"+usNorm((us.meta.ARTIST||"")+"_"+(us.meta.TITLE||tf.name))+"_"+added;
       const coverName=(us.meta.COVER||"").split(/[\\/]/).pop();
       const cover=coverName?files.find(f=>f.webkitRelativePath===dir+"/"+coverName):null;
-      const t={id,title:us.meta.TITLE||tf.name.replace(/\.txt$/i,""),artist:us.meta.ARTIST||"Artiste inconnu",genre:us.meta.GENRE||"Sans genre",emoji:"🎤",kind:"ultrastar",type:"audio",blob:audio,url:URL.createObjectURL(audio),created:Date.now(),lrc:us.lines,ultraStar:{bpm:us.bpm,gap:us.gap,groups:us.groups},coverUrl:cover?URL.createObjectURL(cover):""};
+      // Vidéo UltraStar : priorité au nom exact indiqué par #VIDEO, sinon première vidéo du même dossier.
+      const videoName=(us.meta.VIDEO||"").split(/[\\/]/).pop();
+      const video=files.find(f=>videoName && f.webkitRelativePath===dir+"/"+videoName) ||
+                  files.find(f=>f.webkitRelativePath.startsWith(dir+"/") && /\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv)$/i.test(f.name));
+      const videoGapRaw=parseFloat(String(us.meta.VIDEOGAP||"0").replace(",","."));
+      const t={id,title:us.meta.TITLE||tf.name.replace(/\.txt$/i,""),artist:us.meta.ARTIST||"Artiste inconnu",genre:us.meta.GENRE||"Sans genre",emoji:"🎤",kind:"ultrastar",type:"audio",blob:audio,url:URL.createObjectURL(audio),created:Date.now(),lrc:us.lines,ultraStar:{bpm:us.bpm,gap:us.gap,groups:us.groups,meta:us.meta,video:videoName||"",videoGap:Number.isFinite(videoGapRaw)?videoGapRaw:0},videoBlob:video||null,videoName:video?.name||"",coverUrl:cover?URL.createObjectURL(cover):""};
       // session import: exact File objects remain local and are not uploaded
       tracks=tracks.filter(x=>!(x.kind==="ultrastar"&&usNorm(x.artist+"|"+x.title)===usNorm(t.artist+"|"+t.title)));
       tracks.unshift(t);added++;
@@ -444,7 +453,7 @@ playTrack=function(id){
   const t=tracks.find(x=>x.id===id);
   if(!t||t.kind!=="ultrastar"){ultraStarCurrentId=null;cancelAnimationFrame(ultraStarRaf);return originalPlayTrack(id)}
   currentId=id;lrc=t.lrc||[];ultraStarGroups=t.ultraStar?.groups||[];ultraStarCurrentId=id;
-  ultraStarVideoOffset=Number(t.ultraStar?.videoGap||t.ultraStar?.meta?.VIDEOGAP||0);
+  ultraStarVideoOffset=Number(t.ultraStar?.videoGap||t.ultraStar?.meta?.VIDEOGAP||0)/1000;
   setUltraStarStageVideo(t);
   $("state").textContent=`UltraStar exact · GAP ${(t.ultraStar.gap/1000).toFixed(3)} s${t.videoBlob?" · Vidéo ✓":""}`;
   $("audio").pause();$("video").pause();$("video").classList.add("hidden");$("audio").classList.remove("hidden");
