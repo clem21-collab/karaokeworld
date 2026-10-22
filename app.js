@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.23.1";
+const APP_VERSION="0.23.2";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -436,26 +436,40 @@ function ultraStarLineHTML(group,sec,role){
 function renderUltraStarStage(sec){
   const box=$("stageLyrics"), normal=$("lyrics");
   if(!box||!ultraStarGroups.length)return;
-  let idx=-1;
-  for(let i=0;i<ultraStarGroups.length;i++){if(sec>=ultraStarGroups[i].start_s)idx=i;else break}
-  // If current line has ended, treat the space before the next one as instrumental.
-  let current=idx>=0?ultraStarGroups[idx]:null;
-  let next=ultraStarGroups[idx+1]||null;
-  const inGap=current&&sec>current.end_s&&next&&sec<next.start_s;
-  const beforeFirst=idx<0&&ultraStarGroups[0];
-  if(beforeFirst){
-    const wait=Math.max(0,ultraStarGroups[0].start_s-sec);
-    box.innerHTML=`<div class="us-stage"><div class="us-count">${wait>1?Math.ceil(wait):"🎤"}</div><div class="us-hint">Préparez-vous…</div>${ultraStarLineHTML(ultraStarGroups[0],sec,"next")}</div>`;
-  }else if(inGap){
-    const wait=next.start_s-sec;
-    box.innerHTML=`<div class="us-stage"><div class="us-instrumental">♪ Instrumental ♪</div>${wait<=5?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}${ultraStarLineHTML(next,sec,"next")}</div>`;
-  }else{
+
+  let activeIdx=-1, nextIdx=-1;
+  for(let i=0;i<ultraStarGroups.length;i++){
+    const g=ultraStarGroups[i];
+    if(sec>=g.start_s && sec<=g.end_s+0.08){activeIdx=i;break}
+    if(sec<g.start_s){nextIdx=i;break}
+  }
+  if(activeIdx>=0)nextIdx=activeIdx+1<ultraStarGroups.length?activeIdx+1:-1;
+
+  const current=activeIdx>=0?ultraStarGroups[activeIdx]:null;
+  const next=nextIdx>=0?ultraStarGroups[nextIdx]:null;
+
+  if(current){
     box.innerHTML=`<div class="us-stage">${ultraStarLineHTML(current,sec,"current")}${ultraStarLineHTML(next,sec,"next")}</div>`;
+    if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(current,sec,"current")}${ultraStarLineHTML(next,sec,"next")}</div>`;
+    return;
   }
-  // Compact player view: current + next line, while fullscreen gets the richer stage.
-  if(normal){
-    normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(current||ultraStarGroups[0],sec,"current")}${ultraStarLineHTML(next||ultraStarGroups[1],sec,"next")}</div>`;
+
+  if(next){
+    const wait=Math.max(0,next.start_s-sec);
+    const isIntro=nextIdx===0;
+    box.innerHTML=`<div class="us-stage">
+      ${isIntro?'<div class="us-hint">Préparez-vous…</div>':'<div class="us-instrumental">♪ Instrumental ♪</div>'}
+      ${wait<=5?`<div class="us-count">${Math.max(1,Math.ceil(wait))}</div>`:""}
+      ${ultraStarLineHTML(next,sec,"next")}
+    </div>`;
+    if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(next,sec,"next")}</div>`;
+    return;
   }
+
+  // Fin de chanson : conserver la dernière phrase au lieu d'afficher Instrumental indéfiniment.
+  const last=ultraStarGroups[ultraStarGroups.length-1];
+  box.innerHTML=`<div class="us-stage">${ultraStarLineHTML(last,sec,"current")}</div>`;
+  if(normal)normal.innerHTML=`<div class="us-compact">${ultraStarLineHTML(last,sec,"current")}</div>`;
 }
 function ultraStarTick(){
   if(!ultraStarCurrentId)return;
