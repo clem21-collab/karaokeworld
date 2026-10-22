@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KaraokeWorld · Karadeo Lab</title>
+<style>
+body{font-family:system-ui;background:#08111f;color:#eef4ff;max-width:1050px;margin:auto;padding:22px}
+.card{background:#101b2e;border:1px solid #263853;border-radius:16px;padding:18px;margin:14px 0}
+input,textarea,button{box-sizing:border-box;width:100%;padding:11px;margin:7px 0;border-radius:9px;border:1px solid #38506f;background:#0b1526;color:white}
+button{background:#1769e0;border:0;font-weight:700;cursor:pointer}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+small{color:#aebbd0} pre{white-space:pre-wrap;background:#07101d;padding:12px;border-radius:10px;max-height:320px;overflow:auto}
+.ok{color:#71e39a}.bad{color:#ff8b8b} code{color:#9fc8ff}
+</style></head><body>
+<h1>🎤 KaraokeWorld · Karadeo Lab</h1>
+<div class="card"><b>Test cible :</b> Images — Les démons de minuit<br>
+<small>Vidéo YouTube officielle / auto-générée par l’artiste, fournie par Wagram.</small>
+<input id="url" value="https://www.youtube.com/watch?v=OP1Q1flNbVA">
+</div>
+
+<div class="card">
+<h2>1. Clé API Karadeo</h2>
+<input id="key" type="password" placeholder="kd_...">
+<small>La clé reste dans cette page et n'est pas enregistrée. Pour une vraie version publique de KaraokeWorld, il faudra la garder côté serveur et non dans le navigateur.</small>
+</div>
+
+<div class="card">
+<h2>2. Générer les paroles depuis CETTE vidéo</h2>
+<p>Premier test : Karadeo écoute directement la vidéo et génère un LRC mot par mot. Aucun LRCLIB/SyncLRC et aucun décalage manuel.</p>
+<button id="auto">🤖 Auto-transcription + timing mot par mot</button>
+<h3>Résultat</h3><pre id="out">En attente…</pre>
+<button id="download" disabled>⬇ Enregistrer le LRC obtenu</button>
+</div>
+
+<div class="card">
+<h2>3. Test force-align (facultatif)</h2>
+<p>Si l'auto-transcription fait des fautes, colle ici des paroles que tu es autorisé à utiliser. Karadeo conservera le texte et recalculera seulement les timings sur la vidéo exacte.</p>
+<textarea id="lyrics" rows="8" placeholder="Colle ici les paroles…"></textarea>
+<button id="align">🎯 Aligner ce texte sur la vidéo</button>
+</div>
+
+<script>
+let last="";
+const out=document.getElementById("out");
+async function go(force){
+ const key=document.getElementById("key").value.trim();
+ const fileUrl=document.getElementById("url").value.trim();
+ const transcriptText=document.getElementById("lyrics").value.trim();
+ if(!key){out.textContent="❌ Entre d'abord ta clé API Karadeo (kd_...).";return}
+ if(force && !transcriptText){out.textContent="❌ Colle d'abord le texte à aligner.";return}
+ out.textContent="⏳ Karadeo analyse exactement cette vidéo…";
+ const body={fileUrl,isWordLevel:true,format:"lrc"};
+ if(force) body.transcriptText=transcriptText;
+ try{
+   const r=await fetch("https://karadeo.com/api/transcribe",{
+     method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
+     body:JSON.stringify(body)
+   });
+   const t=await r.text();
+   if(!r.ok){out.textContent="❌ HTTP "+r.status+"\n"+t;return}
+   last=t; out.textContent="✅ LRC reçu :\n\n"+t;
+   document.getElementById("download").disabled=false;
+ }catch(e){
+   out.textContent="❌ "+e+"\n\nSi le navigateur bloque la requête (CORS), utilise le panneau de test officiel Karadeo indiqué dans LISEZ-MOI.txt.";
+ }
+}
+document.getElementById("auto").onclick=()=>go(false);
+document.getElementById("align").onclick=()=>go(true);
+document.getElementById("download").onclick=()=>{
+ const b=new Blob([last],{type:"text/plain;charset=utf-8"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="Images-Les-Demons-de-minuit-Karadeo.lrc";a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+</script></body></html>
