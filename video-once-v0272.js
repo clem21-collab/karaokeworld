@@ -2,6 +2,8 @@
 (()=>{
   const VERSION='0.27.3';
   const CACHE='karaokeworld-converted-video-v1';
+  const TOKEN_KEY='kw_drive_access_token_v1';
+  const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
   const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
   const $=id=>document.getElementById(id);
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -45,11 +47,11 @@
     panel.appendChild(n);return true;
   }
   async function prepareFilesForDrive(files){
-    const out=[],seen=new Map();let reused=0;
+    const out=[];let reused=0;
     for(const f of [...files]){
       if(VIDEO_RX.test(f.name)){
         const pf=await getPreparedFile(f);
-        if(pf){out.push(pf);seen.set(key(f),true);reused++;continue}
+        if(pf){out.push(pf);reused++;continue}
       }
       out.push(f);
     }
@@ -69,6 +71,27 @@
     };
     return true;
   }
+  function driveToken(){try{const t=sessionStorage.getItem(TOKEN_KEY)||'',exp=Number(sessionStorage.getItem(TOKEN_EXP_KEY)||0);return t&&exp>Date.now()+30000?t:''}catch(e){return ''}}
+  async function migrateLegacySongFolders(){
+    const token=driveToken();if(!token)return 0;
+    try{
+      const q="trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has { key='kwType' and value='song' }";
+      let pageToken='',changed=0;
+      do{
+        const params=new URLSearchParams({spaces:'drive',pageSize:'1000',fields:'nextPageToken,files(id,appProperties)',q});if(pageToken)params.set('pageToken',pageToken);
+        const r=await fetch('https://www.googleapis.com/drive/v3/files?'+params.toString(),{headers:{Authorization:'Bearer '+token}});if(!r.ok)return changed;
+        const data=await r.json();
+        for(const f of data.files||[]){
+          const ap=f.appProperties||{};if(!ap.kwSongId||ap.kwApp==='KaraokeWorld')continue;
+          const p=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?fields=id`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json; charset=UTF-8'},body:JSON.stringify({appProperties:{...ap,kwApp:'KaraokeWorld'}})});
+          if(p.ok)changed++;
+        }
+        pageToken=data.nextPageToken||'';
+      }while(pageToken);
+      if(changed)console.info(`KaraokeWorld: ${changed} ancien${changed>1?'s':''} dossier${changed>1?'s':''} Drive migré${changed>1?'s':''}.`);
+      return changed;
+    }catch(e){console.warn('KaraokeWorld migration anciens dossiers Drive',e);return 0}
+  }
   function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.27.3 · Google Drive ☁️'}
   async function start(){
     for(let i=0;i<80;i++){
@@ -77,9 +100,10 @@
       if(attachApi()&&patchDriveInput()&&ensureNotice()&&i>10)break;
       await sleep(250);
     }
-    reuseForTracks();
+    reuseForTracks();migrateLegacySongFolders();
+    window.addEventListener('kw-drive-token',()=>setTimeout(migrateLegacySongFolders,300));
     setInterval(()=>{attachApi();patchDriveInput();ensureNotice();reuseForTracks();markVersion()},5000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,reuseForTracks};
+  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,reuseForTracks,migrateLegacySongFolders};
 })();
