@@ -27,17 +27,16 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.26.1 — charge la préparation automatique des vidéos dès l'import UltraStar.
+// v0.26.7 — le moteur de conversion est chargé par le chargeur principal v0.26.6/0.26.7.
+// Ne plus le charger ici : deux instances créaient deux files de conversion concurrentes.
 (()=>{
-  function loadPreconvert(){
-    if(document.querySelector('script[data-kw-preconvert]'))return;
+  function loadFix(){
+    if(document.querySelector('script[data-kw-v0267]'))return;
     const s=document.createElement('script');
-    s.src='./video-preconvert-v0261.js';
+    s.src='./hotfix-v0267.js?v=0267';
     s.async=false;
-    s.dataset.kwPreconvert='1';
+    s.dataset.kwV0267='1';
     document.body.appendChild(s);
-    const badge=document.querySelector('.brand small');
-    if(badge)badge.textContent=' BETA · v0.26.1 · UltraStar 🎤';
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadPreconvert);else loadPreconvert();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadFix);else loadFix();
 })();
