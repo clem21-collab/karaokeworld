@@ -1,8 +1,8 @@
-/* KaraokeWorld v0.28.0 — affichage de version stable, indépendant des anciens modules */
+/* KaraokeWorld v0.28.1 — affichage de version stable, indépendant des anciens modules */
 (()=>{
   if(window.KaraokeWorldVersionDisplay?.installed)return;
-  const VERSION='0.28.0';
-  const LABEL='BETA · v0.28.0 · Drive durée réelle ☁️';
+  const VERSION='0.28.1';
+  const LABEL='BETA · v0.28.1 · Drive auto 🔁';
 
   function install(){
     const brand=document.querySelector('.brand');
