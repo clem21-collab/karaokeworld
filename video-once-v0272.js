@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.27.3 — conversion vidéo une seule fois + réutilisation cache/Drive */
+/* KaraokeWorld v0.27.4 — conversion vidéo une seule fois + réutilisation cache/Drive + dédoublonnage bibliothèque */
 (()=>{
-  const VERSION='0.27.3';
+  const VERSION='0.27.4';
   const CACHE='karaokeworld-converted-video-v1';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
@@ -8,6 +8,8 @@
   const $=id=>document.getElementById(id);
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const key=f=>[f?.name||'video',f?.size||0,f?.lastModified||0].join('|');
+  const norm=s=>String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const songKey=t=>norm(`${t?.artist||''}|${t?.title||''}`);
   function cacheUrl(f){let h=2166136261,s=key(f);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href}
   async function getPreparedBlob(f){
     if(!f)return null;
@@ -37,6 +39,38 @@
         if(blob){t.compatVideoBlob=blob;t._kwPreparedFromCache=true}
       }
     }catch(e){console.warn('KaraokeWorld conversion unique: réutilisation cache',e)}
+  }
+  function reconcileCloudDuplicates(){
+    try{
+      if(typeof tracks==='undefined'||!Array.isArray(tracks)||!tracks.length)return false;
+      const locals=new Map();
+      for(const t of tracks){
+        if(t?.cloudUltraStar)continue;
+        const k=songKey(t);if(k&&!locals.has(k))locals.set(k,t);
+      }
+      let changed=false;
+      const next=[];
+      for(const t of tracks){
+        if(t?.cloudUltraStar){
+          const local=locals.get(songKey(t));
+          if(local){
+            local.cloudBackup=true;
+            local.cloudBackupDocId=t.cloudDocId||local.cloudBackupDocId;
+            local.cloudBackupManifest=t.cloudManifest||local.cloudBackupManifest;
+            changed=true;
+            continue;
+          }
+        }
+        next.push(t);
+      }
+      if(changed){
+        tracks=next;
+        try{drawTracks()}catch(e){}
+        try{drawPlaylists()}catch(e){}
+        console.info('KaraokeWorld: doublons local + Google Drive masqués dans la bibliothèque.');
+      }
+      return changed;
+    }catch(e){console.warn('KaraokeWorld dédoublonnage bibliothèque',e);return false}
   }
   function ensureNotice(){
     const panel=$('ultraStarPreconvert');if(!panel)return false;
@@ -92,18 +126,18 @@
       return changed;
     }catch(e){console.warn('KaraokeWorld migration anciens dossiers Drive',e);return 0}
   }
-  function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.27.3 · Google Drive ☁️'}
+  function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.27.4 · Google Drive ☁️'}
   async function start(){
     for(let i=0;i<80;i++){
-      attachApi();patchDriveInput();ensureNotice();markVersion();
+      attachApi();patchDriveInput();ensureNotice();markVersion();reconcileCloudDuplicates();
       if(i%5===0)reuseForTracks();
       if(attachApi()&&patchDriveInput()&&ensureNotice()&&i>10)break;
       await sleep(250);
     }
-    reuseForTracks();migrateLegacySongFolders();
-    window.addEventListener('kw-drive-token',()=>setTimeout(migrateLegacySongFolders,300));
-    setInterval(()=>{attachApi();patchDriveInput();ensureNotice();reuseForTracks();markVersion()},5000);
+    reuseForTracks();reconcileCloudDuplicates();migrateLegacySongFolders();
+    window.addEventListener('kw-drive-token',()=>setTimeout(()=>{migrateLegacySongFolders();reconcileCloudDuplicates()},300));
+    setInterval(()=>{attachApi();patchDriveInput();ensureNotice();reuseForTracks();reconcileCloudDuplicates();markVersion()},2500);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,reuseForTracks,migrateLegacySongFolders};
+  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,reuseForTracks,migrateLegacySongFolders,reconcileCloudDuplicates};
 })();
