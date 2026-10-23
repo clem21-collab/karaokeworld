@@ -1,7 +1,7 @@
-/* KaraokeWorld v0.27.6 — Voix ON/OFF + préparation instrumentale IA persistante */
+/* KaraokeWorld v0.27.9 — Voix ON/OFF + préparation IA indépendante de Google Drive */
 (()=>{
   if(window.KaraokeWorldVocalSeparation?.installed)return;
-  const VERSION='0.27.6';
+  const VERSION='0.27.9';
   const MODEL='UVR_MDXNET_KARA_2';
   const LIB_URL='https://esm.sh/web-audio-separation@0.3.0?deps=onnxruntime-web@1.29.0';
   const STEM_CACHE='karaokeworld-instrumental-v1';
@@ -17,6 +17,7 @@
 
   let separator=null,separatorPromise=null,processingTrack=null;
   let voiceOff=false,lastCurrentId=null,activeStemUrl='';
+  let syncingDrive=false;
   let batch={running:false,stopRequested:false,total:0,done:0,current:null};
 
   function tracksNow(){try{return Array.isArray(tracks)?tracks:[]}catch(e){return []}}
@@ -42,6 +43,7 @@
   function setStatus(s){const el=$('kwVocalStatus');if(el)el.textContent=s}
   function setBadge(s){const el=$('kwVocalBadge');if(el)el.textContent=s}
   function setProgress(n){const el=$('kwVocalBar');if(el)el.style.width=Math.max(0,Math.min(100,Number(n)||0))+'%'}
+  function showDriveAuthorize(show=true){$('kwVocalAuthorize')?.classList.toggle('hidden',!show)}
   function readCheckpoint(){try{return JSON.parse(localStorage.getItem(CHECKPOINT_KEY)||'null')}catch(e){return null}}
   function saveCheckpoint(data){try{localStorage.setItem(CHECKPOINT_KEY,JSON.stringify({...data,active:true,updatedAt:Date.now()}))}catch(e){}}
   function clearCheckpoint(){try{localStorage.removeItem(CHECKPOINT_KEY)}catch(e){}}
@@ -132,17 +134,52 @@
     }
     if(!blob&&generate)blob=await separateLocally(t);
     if(blob&&persistDrive&&manifestOf(t)?.driveFolderId&&!driveReady(t)){
-      setStatus(`☁ Sauvegarde de l’instrumental · ${t.artist} — ${t.title}…`);
-      await uploadStem(t,blob,p=>{if(batch.running&&batch.total)setProgress(((batch.done+.94+.06*p)/batch.total)*100)});
+      if(!driveToken()){showDriveAuthorize(true);return blob}
+      try{
+        setStatus(`☁ Sauvegarde de l’instrumental · ${t.artist} — ${t.title}…`);
+        await uploadStem(t,blob,p=>{if(batch.running&&batch.total)setProgress(((batch.done+.94+.06*p)/batch.total)*100)});
+      }catch(e){
+        if(e?.code==='drive-auth'||e?.status===401){showDriveAuthorize(true);return blob}
+        throw e;
+      }
     }
     return blob;
   }
-  async function batchReady(t){
-    if(driveReady(t))return true;
-    const cached=!!(await cacheGet(t));
-    return manifestOf(t)?.driveFolderId?false:cached;
-  }
+  async function batchReady(t){return driveReady(t)||!!(await cacheGet(t))}
   async function usableReady(t){return driveReady(t)||!!(await cacheGet(t))}
+
+  async function countPendingDrive(){
+    let n=0;
+    for(const t of tracksNow().filter(eligible)){
+      if(!manifestOf(t)?.driveFolderId||driveReady(t))continue;
+      if(await cacheGet(t))n++;
+    }
+    return n;
+  }
+
+  async function syncPendingDrive({quiet=false}={}){
+    if(syncingDrive||!driveToken())return 0;
+    syncingDrive=true;let sent=0;
+    try{
+      const list=tracksNow().filter(eligible);
+      for(const t of list){
+        if(!manifestOf(t)?.driveFolderId||driveReady(t))continue;
+        const blob=await cacheGet(t);if(!blob)continue;
+        if(!quiet)setStatus(`☁ Synchronisation Drive · ${t.artist} — ${t.title}…`);
+        try{await uploadStem(t,blob);sent++}
+        catch(e){
+          if(e?.code==='drive-auth'||e?.status===401){showDriveAuthorize(true);break}
+          console.warn('KaraokeWorld synchro instrumental Drive',t?.title,e);
+        }
+      }
+      const left=await countPendingDrive();
+      if(!quiet){
+        if(left===0&&sent)setStatus(`✅ Google Drive synchronisé · ${sent} instrumental${sent>1?'aux':''} envoyé${sent>1?'s':''}.`);
+        else if(left>0)setStatus(`☁ ${left} instrumental${left>1?'aux':''} encore en attente de Google Drive. La préparation IA locale reste utilisable.`);
+      }
+      return sent;
+    }finally{syncingDrive=false;countReady()}
+  }
 
   async function countReady(){const list=tracksNow().filter(eligible);let n=0;for(const t of list)if(await usableReady(t))n++;setBadge(`${n}/${list.length} prêtes`);return{ready:n,total:list.length}}
 
@@ -158,7 +195,7 @@
       if(voiceOff){await swapAudio(t.url);voiceOff=false;if(activeStemUrl){URL.revokeObjectURL(activeStemUrl);activeStemUrl=''}setStatus(`🎤 Voix originale · ${t.artist} — ${t.title}`);return}
       setStatus(`🎶 Préparation Voix OFF · ${t.artist} — ${t.title}…`);const blob=await getOrPrepare(t,{generate:true,persistDrive:true});if(!blob)throw new Error('Instrumental indisponible.');
       if(activeStemUrl)URL.revokeObjectURL(activeStemUrl);activeStemUrl=URL.createObjectURL(blob);await swapAudio(activeStemUrl);voiceOff=true;setStatus(`🎶 Voix OFF · ${t.artist} — ${t.title}`);countReady();
-    }catch(e){console.error(e);if(e?.code==='drive-auth'||e?.status===401){$('kwVocalAuthorize')?.classList.remove('hidden');setStatus('🔐 Réautorise Google Drive puis réessaie.')}else setStatus('Voix OFF impossible : '+(e?.message||e))}
+    }catch(e){console.error(e);if(e?.code==='drive-auth'||e?.status===401){showDriveAuthorize(true);setStatus('🔐 Réautorise Google Drive puis réessaie.')}else setStatus('Voix OFF impossible : '+(e?.message||e))}
     finally{refreshVoiceButtons()}
   }
 
@@ -168,7 +205,7 @@
   }
   function ensurePanel(){
     let box=$('kwVocalPanel');if(box)return box;const host=$('ultrastarPanel');if(!host)return null;box=document.createElement('div');box.id='kwVocalPanel';box.style.cssText='margin-top:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a';
-    box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🎤 Voix ON/OFF · préparation IA</b><span id="kwVocalBadge" class="status">Analyse…</span></div><p class="muted" style="margin:7px 0">Prépare toute la bibliothèque avec <b>${MODEL}</b>. Le traitement se fait sur ce PC, une chanson à la fois. Le modèle IA est téléchargé une seule fois puis conservé.</p><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden"><i id="kwVocalBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#ec4899,#8b5cf6,#38bdf8);transition:width .2s ease"></i></div><div id="kwVocalStatus" class="muted" style="margin-top:7px">Prêt. Chaque instrumental terminé est gardé dans le navigateur et sauvegardé sur Google Drive quand il est disponible.</div><div class="controls wrap" style="justify-content:flex-start;margin-top:8px"><button id="kwVocalPrepareAll" type="button">🎶 Préparer toutes les chansons</button><button id="kwVocalStop" class="danger hidden" type="button">⏹ Arrêter après cette chanson</button><button id="kwVocalResume" class="secondary hidden" type="button">▶ Reprendre</button><button id="kwVocalAuthorize" class="secondary hidden" type="button">🔐 Réautoriser Drive</button></div><div class="muted" style="font-size:11px;margin-top:6px">ℹ️ Si tu interromps la préparation, les chansons déjà terminées ne seront pas recalculées. Évite de chanter pendant le traitement : l’IA peut utiliser fortement le GPU/CPU.</div>`;
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🎤 Voix ON/OFF · préparation IA</b><span id="kwVocalBadge" class="status">Analyse…</span></div><p class="muted" style="margin:7px 0">Prépare toute la bibliothèque avec <b>${MODEL}</b>. Le calcul IA continue même si l’autorisation Google Drive expire ; les instrumentaux sont alors conservés localement puis synchronisés après réautorisation.</p><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden"><i id="kwVocalBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#ec4899,#8b5cf6,#38bdf8);transition:width .2s ease"></i></div><div id="kwVocalStatus" class="muted" style="margin-top:7px">Prêt. Chaque instrumental terminé est gardé dans le navigateur et sauvegardé sur Google Drive quand l’autorisation est disponible.</div><div class="controls wrap" style="justify-content:flex-start;margin-top:8px"><button id="kwVocalPrepareAll" type="button">🎶 Préparer toutes les chansons</button><button id="kwVocalStop" class="danger hidden" type="button">⏹ Arrêter après cette chanson</button><button id="kwVocalResume" class="secondary hidden" type="button">▶ Reprendre</button><button id="kwVocalAuthorize" class="secondary hidden" type="button">🔐 Réautoriser Drive</button></div><div class="muted" style="font-size:11px;margin-top:6px">ℹ️ Une expiration Drive ne coupe plus la préparation IA. Les instrumentaux calculés restent en cache et sont envoyés plus tard sans être recalculés.</div>`;
     const ref=$('cloudUltraStarBox');if(ref)ref.insertAdjacentElement('beforebegin',box);else host.appendChild(box);
     $('kwVocalPrepareAll').onclick=startBatch;$('kwVocalStop').onclick=()=>{batch.stopRequested=true;setStatus('⏹ Arrêt demandé : fin de la chanson en cours puis pause.')};$('kwVocalResume').onclick=startBatch;$('kwVocalAuthorize').onclick=()=>$('cloudDriveAuthorize')?.click();
     const cp=readCheckpoint();if(cp?.active){$('kwVocalResume').classList.remove('hidden');setStatus(`⚠️ Préparation interrompue · ${cp.done||0}/${cp.total||'?'} terminées. Clique sur Reprendre.`)}return box;
@@ -178,29 +215,39 @@
 
   async function startBatch(){
     if(batch.running)return;ensurePanel();await requestPersistence();const list=tracksNow().filter(eligible);if(!list.length){setStatus('Aucune chanson UltraStar chargée. Connecte d’abord ton dossier.');return}
-    if(list.some(t=>manifestOf(t)?.driveFolderId&&!driveReady(t))&&!driveToken()){$('kwVocalAuthorize')?.classList.remove('hidden');setStatus('🔐 Autorise Google Drive avant de lancer la préparation complète, afin que chaque instrumental soit sauvegardé définitivement.');return}
+    if(!driveToken()&&list.some(t=>manifestOf(t)?.driveFolderId&&!driveReady(t))){showDriveAuthorize(true);setStatus('ℹ️ Google Drive n’est pas autorisé pour le moment : la préparation IA va quand même continuer localement. Tu pourras réautoriser Drive ensuite.');await sleep(900)}
     batch={running:true,stopRequested:false,total:list.length,done:0,current:null};saveCheckpoint({total:list.length,done:0,current:''});refreshBatchButtons();setProgress(0);
     try{
       setStatus(`Analyse de ${list.length} chansons…`);for(const t of list)if(await batchReady(t))batch.done++;setBadge(`${batch.done}/${batch.total} prêtes`);saveCheckpoint({total:batch.total,done:batch.done,current:''});
-      if(batch.done>=batch.total){clearCheckpoint();setProgress(100);setStatus(`✅ Les ${batch.total} chansons sont déjà prêtes pour Voix ON/OFF.`);return}
+      if(batch.done>=batch.total){clearCheckpoint();setProgress(100);const pending=await countPendingDrive();setStatus(pending?`✅ Les ${batch.total} chansons sont prêtes localement · ${pending} en attente de synchronisation Google Drive.`:`✅ Les ${batch.total} chansons sont déjà prêtes pour Voix ON/OFF.`);if(pending)showDriveAuthorize(true);return}
       await ensureSeparator();
       for(const t of list){
         if(batch.stopRequested)break;if(await batchReady(t))continue;batch.current=t;processingTrack=t;saveCheckpoint({total:batch.total,done:batch.done,current:`${t.artist} — ${t.title}`});setStatus(`🎤 ${t.artist} — ${t.title} · préparation…`);
-        try{const blob=await getOrPrepare(t,{generate:true,persistDrive:true});if(!blob)throw new Error('Instrumental non généré.');batch.done++;setBadge(`${batch.done}/${batch.total} prêtes`);setProgress(batch.done/batch.total*100);saveCheckpoint({total:batch.total,done:batch.done,current:''})}
-        catch(e){console.error('KaraokeWorld préparation vocale',e);if(e?.code==='drive-auth'||e?.status===401){batch.stopRequested=true;$('kwVocalAuthorize')?.classList.remove('hidden');setStatus(`🔐 Drive a expiré après ${batch.done}/${batch.total}. Réautorise puis clique sur Reprendre : le calcul déjà effectué restera en cache et sera seulement envoyé sur Drive.`);break}setStatus(`⚠️ ${t.artist} — ${t.title} : ${e?.message||e}. Passage à la suivante…`);await sleep(700)}
-        finally{batch.current=null;processingTrack=null}
+        try{
+          const blob=await getOrPrepare(t,{generate:true,persistDrive:true});if(!blob)throw new Error('Instrumental non généré.');
+          batch.done++;setBadge(`${batch.done}/${batch.total} prêtes`);setProgress(batch.done/batch.total*100);saveCheckpoint({total:batch.total,done:batch.done,current:''});
+          if(!driveToken()&&manifestOf(t)?.driveFolderId&&!driveReady(t))showDriveAuthorize(true);
+        }catch(e){
+          console.error('KaraokeWorld préparation vocale',e);
+          if((e?.code==='drive-auth'||e?.status===401)&&!(t?.blob instanceof Blob)&&!t?.url){showDriveAuthorize(true);setStatus(`🔐 ${t.artist} — ${t.title} dépend de Google Drive pour lire l’audio source. Cette chanson attendra la réautorisation, les chansons locales continuent.`);await sleep(700);continue}
+          setStatus(`⚠️ ${t.artist} — ${t.title} : ${e?.message||e}. Passage à la suivante…`);await sleep(700)
+        }finally{batch.current=null;processingTrack=null}
       }
-      if(batch.done>=batch.total){clearCheckpoint();setProgress(100);setStatus(`✅ Préparation terminée · ${batch.done}/${batch.total} chansons prêtes. Voix ON/OFF est maintenant instantané.`)}else if(batch.stopRequested&&!/Drive a expiré/.test($('kwVocalStatus')?.textContent||''))setStatus(`⏸ Préparation arrêtée · ${batch.done}/${batch.total} terminées. Clique sur Reprendre quand tu veux.`)
+      if(!batch.stopRequested){
+        clearCheckpoint();setProgress(100);const pending=await countPendingDrive();
+        if(pending){showDriveAuthorize(true);setStatus(`✅ Préparation IA terminée · ${batch.done}/${batch.total} prêtes localement · ☁ ${pending} instrumental${pending>1?'aux':''} à synchroniser après réautorisation Drive.`)}
+        else setStatus(`✅ Préparation terminée · ${batch.done}/${batch.total} chansons prêtes. Voix ON/OFF est maintenant instantané.`)
+      }else setStatus(`⏸ Préparation arrêtée · ${batch.done}/${batch.total} terminées. Clique sur Reprendre quand tu veux.`)
     }catch(e){console.error(e);setStatus('Préparation interrompue : '+(e?.message||e))}
     finally{batch.running=false;batch.current=null;processingTrack=null;refreshBatchButtons();countReady();refreshVoiceButtons()}
   }
 
   function watchTrack(){let id=null;try{id=currentId}catch(e){}if(id!==lastCurrentId){lastCurrentId=id;voiceOff=false;if(activeStemUrl){try{URL.revokeObjectURL(activeStemUrl)}catch(e){}activeStemUrl=''}refreshVoiceButtons()}}
-  function markVersion(){const s=document.querySelector('.brand small');if(s&&s.textContent!==' BETA · v0.27.6 · Voix ON/OFF 🎤')s.textContent=' BETA · v0.27.6 · Voix ON/OFF 🎤'}
+  function markVersion(){const s=document.querySelector('.brand small');if(s&&s.textContent!==' BETA · v0.27.9 · Drive résilient ☁️')s.textContent=' BETA · v0.27.9 · Drive résilient ☁️'}
   function boot(){ensureButtons();ensurePanel();markVersion();[300,800,1600,3000,5000].forEach(ms=>setTimeout(()=>{ensureButtons();ensurePanel();markVersion();countReady()},ms));setInterval(()=>{ensureButtons();ensurePanel();watchTrack();markVersion()},1500);setInterval(()=>countReady(),15000)}
 
   window.addEventListener('beforeunload',e=>{if(batch.running){e.preventDefault();e.returnValue=''}});
-  window.addEventListener('kw-drive-token',()=>{$('kwVocalAuthorize')?.classList.add('hidden');countReady()});
-  window.KaraokeWorldVocalSeparation={version:VERSION,installed:true,model:MODEL,startAll:startBatch,toggle:toggleVoice,countPrepared:countReady,stemCacheName:STEM_CACHE,modelCacheName:MODEL_CACHE};
+  window.addEventListener('kw-drive-token',()=>{showDriveAuthorize(false);countReady();setTimeout(()=>syncPendingDrive({quiet:false}),300)});
+  window.KaraokeWorldVocalSeparation={version:VERSION,installed:true,model:MODEL,startAll:startBatch,toggle:toggleVoice,countPrepared:countReady,syncPendingDrive,countPendingDrive,stemCacheName:STEM_CACHE,modelCacheName:MODEL_CACHE};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
