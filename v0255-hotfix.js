@@ -27,24 +27,22 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.26.7 — le moteur de conversion est chargé par le chargeur principal v0.26.6/0.26.7.
-// Ne plus le charger ici : deux instances créaient deux files de conversion concurrentes.
+// v0.27.6 — chargeur des correctifs complémentaires.
+// Le moteur vidéo principal reste chargé par recently-sung.js pour éviter deux files concurrentes.
 (()=>{
-  function loadFix(){
-    if(!document.querySelector('script[data-kw-v0267]')){
-      const s=document.createElement('script');
-      s.src='./hotfix-v0267.js?v=0275';
-      s.async=false;
-      s.dataset.kwV0267='1';
-      document.body.appendChild(s);
-    }
-    if(!document.querySelector('script[data-kw-dedupe-v0275]')){
-      const d=document.createElement('script');
-      d.src='./library-dedupe-v0275.js?v=0275';
-      d.async=false;
-      d.dataset.kwDedupeV0275='1';
-      document.body.appendChild(d);
-    }
+  const addons=[
+    {src:'./hotfix-v0267.js?v=0276',key:'hotfix'},
+    {src:'./video-once-v0272.js?v=0276',key:'video-once'},
+    {src:'./library-dedupe-v0275.js?v=0276',key:'dedupe'},
+    {src:'./vocal-separation-v0276.js?v=0276',key:'vocals'}
+  ];
+  function load(i=0){
+    if(i>=addons.length)return;
+    const a=addons[i],sel=`script[data-kw-extra="${a.key}"]`;
+    if(document.querySelector(sel)){load(i+1);return}
+    const s=document.createElement('script');s.src=a.src;s.async=false;s.dataset.kwExtra=a.key;
+    s.onload=()=>load(i+1);s.onerror=()=>{console.warn('Extension KaraokeWorld non chargée',a.src);load(i+1)};
+    document.body.appendChild(s);
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadFix);else loadFix();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>load(),{once:true});else load();
 })();
