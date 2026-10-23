@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.27.7 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
+/* KaraokeWorld v0.27.9 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
 (()=>{
-  const VERSION='0.27.7';
+  const VERSION='0.27.9';
   const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
@@ -146,7 +146,7 @@
 
   function markVersion(){
     const small=document.querySelector('.brand small');
-    if(small&&small.textContent!==' BETA · v0.27.7 · Voix ON/OFF 🎤')small.textContent=' BETA · v0.27.7 · Voix ON/OFF 🎤';
+    if(small&&small.textContent!==' BETA · v0.27.9 · Drive résilient ☁️')small.textContent=' BETA · v0.27.9 · Drive résilient ☁️';
   }
   function start(){
     markVersion();patchGoogleAuth();watchUpload();
