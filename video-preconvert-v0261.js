@@ -1,122 +1,117 @@
-/* KaraokeWorld v0.26.4 — préconversion UltraStar parallèle + temps restant estimé */
+/* KaraokeWorld v0.26.5 — dossier UltraStar mémorisé + arrêt/reprise + cycle de vie */
 (()=>{
 const CACHE='karaokeworld-converted-video-v1',WORKER='./video-compat-worker-v0260.js',RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
-const jobs=new Map(),active=new Map();let token=0,total=0,done=0,currentRun=null,ticker=0;
+const HANDLE_DB='karaokeworld_handles',HANDLE_STORE='handles',HANDLE_KEY='ultrastar-root';
+const jobs=new Map(),active=new Map(),workerTasks=new Map();
+let token=0,total=0,done=0,currentRun=null,ticker=0,rememberedHandle=null,backgroundSince=0,folderScanBusy=false;
 const $=id=>document.getElementById(id),key=f=>[f?.name||'video',f?.size||0,f?.lastModified||0].join('|'),limit=n=>Math.max(1,Math.min(4,parseInt(n,10)||2));
 const concurrency=()=>limit(localStorage.getItem('kw_video_concurrency')||2),setConcurrency=n=>localStorage.setItem('kw_video_concurrency',String(limit(n)));
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function norm(s){return String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function ck(f){let h=2166136261,s=key(f);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href}
 async function cached(f){try{return !!(await(await caches.open(CACHE)).match(ck(f)))}catch(e){return false}}
 async function cache(f,b){try{await(await caches.open(CACHE)).put(ck(f),new Response(b,{headers:{'Content-Type':'video/mp4'}}))}catch(e){}}
-function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtTime(sec){sec=Math.max(0,Math.round(Number(sec)||0));if(sec<60)return `${sec} s`;const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;if(h)return `${h} h ${String(m).padStart(2,'0')} min`;return `${m} min ${String(s).padStart(2,'0')} s`}
 function phase(label){if(/Conversion MP4/i.test(label))return'transcode';if(/Adaptation/i.test(label))return'remux';if(/Vérification|Démarrage/i.test(label))return'check';return'other'}
-function box(){let b=$('ultraStarPreconvert');if(b)return b;const p=$('ultrastarPanel');if(!p)return null;b=document.createElement('div');b.id='ultraStarPreconvert';b.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a;display:none';b.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🎬 Préparation automatique des vidéos</b><span id="ultraStarPreconvertCount" class="status">0/0</span></div><div id="ultraStarPreconvertText" class="muted" style="margin-top:6px"></div><div id="ultraStarPreconvertEta" style="margin-top:7px;font-weight:800">⏱ Calcul du temps restant…</div><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:8px"><i id="ultraStarPreconvertBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#34d399,#56dfff)"></i></div><div id="ultraStarPreconvertPool" class="muted" style="font-size:11px;margin-top:7px"></div><div id="ultraStarPreconvertActive" style="display:grid;gap:5px;margin-top:8px"></div>';p.appendChild(b);return b}
-function activeEta(x){
-  if(!x||x.p<=1)return null;
-  const ph=phase(x.label);if(ph!=='remux'&&ph!=='transcode')return null;
-  const elapsed=(Date.now()-(x.phaseStartedAt||x.startedAt||Date.now()))/1000;
-  if(elapsed<4||x.p<3)return null;
-  const rate=x.p/elapsed;if(rate<=0)return null;
-  return Math.max(0,(100-x.p)/rate);
+function box(){
+  let b=$('ultraStarPreconvert');if(b)return b;const p=$('ultrastarPanel');if(!p)return null;
+  b=document.createElement('div');b.id='ultraStarPreconvert';b.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a;display:none';
+  b.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🎬 Préparation automatique des vidéos</b><span id="ultraStarPreconvertCount" class="status">0/0</span></div><div id="ultraStarPreconvertText" class="muted" style="margin-top:6px"></div><div id="ultraStarPreconvertEta" style="margin-top:7px;font-weight:800">⏱ Calcul du temps restant…</div><div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:8px"><i id="ultraStarPreconvertBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#34d399,#56dfff)"></i></div><div id="ultraStarPreconvertPool" class="muted" style="font-size:11px;margin-top:7px"></div><div id="ultraStarLifecycle" class="muted" style="font-size:11px;margin-top:5px"></div><div class="controls wrap" style="justify-content:flex-start;margin-top:8px"><button id="ultraStarStopConversions" class="danger" type="button">⏹ Arrêter toutes les conversions</button><button id="ultraStarResumeConversions" class="secondary hidden" type="button">▶ Reprendre les conversions</button></div><div id="ultraStarPreconvertActive" style="display:grid;gap:5px;margin-top:8px"></div>';
+  p.appendChild(b);bindControlButtons();return b;
 }
-function averageJobSeconds(){
-  const r=currentRun;if(!r)return null;
-  const vals=(r.durations||[]).filter(x=>Number.isFinite(x)&&x>0);
-  if(vals.length>=2){
-    const s=[...vals].sort((a,b)=>a-b),mid=Math.floor(s.length/2);
-    return s.length%2?s[mid]:(s[mid-1]+s[mid])/2;
-  }
-  const projected=[];
-  for(const x of active.values()){
-    const eta=activeEta(x);
-    if(eta!=null){
-      const elapsed=(Date.now()-(x.startedAt||Date.now()))/1000;
-      projected.push(elapsed+eta);
-    }
-  }
-  if(projected.length)return projected.reduce((a,b)=>a+b,0)/projected.length;
-  return null;
+function activeEta(x){if(!x||x.p<=1)return null;const ph=phase(x.label);if(ph!=='remux'&&ph!=='transcode')return null;const elapsed=(Date.now()-(x.phaseStartedAt||x.startedAt||Date.now()))/1000;if(elapsed<4||x.p<3)return null;const rate=x.p/elapsed;if(rate<=0)return null;return Math.max(0,(100-x.p)/rate)}
+function globalEta(){
+  const run=currentRun;if(!run||run.paused||!total||done>=total)return null;
+  const now=Date.now(),rates=[];
+  for(const x of active.values()){const ph=phase(x.label);if((ph==='remux'||ph==='transcode')&&x.p>=3){const sec=(now-(x.phaseStartedAt||x.startedAt||now))/1000;if(sec>=4)rates.push({bps:(x.size||1)/(sec/(x.p/100)),secPerFile:sec/(x.p/100)})}}
+  const hist=run.history||[];let avgSec=hist.length?hist.reduce((a,b)=>a+b,0)/hist.length:null;
+  if(!avgSec&&rates.length)avgSec=rates.reduce((a,b)=>a+b.secPerFile,0)/rates.length;
+  if(!avgSec)return null;
+  let activeRemaining=0;for(const x of active.values()){const e=activeEta(x);activeRemaining+=e==null?avgSec:e}
+  const queued=run.queue.length;const slots=Math.max(1,concurrency());const waves=Math.ceil(queued/slots);return Math.max(activeRemaining/Math.max(1,Math.min(slots,active.size||1)),waves*avgSec);
 }
-function overallEta(){
-  if(!currentRun||done>=total)return 0;
-  const n=concurrency(),activeVals=[...active.values()];
-  const activeWork=activeVals.reduce((sum,x)=>sum+(activeEta(x)??0),0);
-  const unknownActive=activeVals.filter(x=>activeEta(x)==null).length;
-  const avg=averageJobSeconds();
-  const queued=Math.max(0,currentRun.entries.length-currentRun.next);
-  if(avg==null&&activeWork<=0)return null;
-  const fallback=avg??Math.max(8,activeWork/Math.max(1,activeVals.length));
-  const work=activeWork+unknownActive*fallback+queued*fallback;
-  const slots=Math.max(1,Math.min(n,Math.max(1,activeVals.length+queued)));
-  return Math.max(1,work/slots);
-}
+function updateControls(){const run=currentRun,stop=$('ultraStarStopConversions'),resume=$('ultraStarResumeConversions');if(!stop||!resume)return;const paused=!!run?.paused;stop.classList.toggle('hidden',!run||run.finished||paused);resume.classList.toggle('hidden',!run||run.finished||!paused);resume.textContent=run?.pauseReason==='lifecycle'?'▶ Reprendre après mise en veille':'▶ Reprendre les conversions'}
 function paint(text=''){
-  const b=box();if(b)b.style.display='block';
-  const n=concurrency(),queued=currentRun?Math.max(0,currentRun.entries.length-currentRun.next):0,running=currentRun?.running||active.size;
+  const b=box();if(b)b.style.display='block';const run=currentRun,n=concurrency(),queued=run?run.queue.length:0,running=run?.running||active.size;
   if($('ultraStarPreconvertCount'))$('ultraStarPreconvertCount').textContent=`${done}/${total}`;
   if(text&&$('ultraStarPreconvertText'))$('ultraStarPreconvertText').textContent=text;
   if($('ultraStarPreconvertBar'))$('ultraStarPreconvertBar').style.width=`${total?Math.round(done/total*100):100}%`;
-  if($('ultraStarPreconvertPool'))$('ultraStarPreconvertPool').textContent=`${running} active${running>1?'s':''} / ${n} autorisée${n>1?'s':''}${queued?` · ${queued} en attente`:''}`;
-  const eta=overallEta(),etaEl=$('ultraStarPreconvertEta');
-  if(etaEl){
-    if(done>=total&&total>0)etaEl.textContent='⏱ Terminé';
-    else if(eta==null)etaEl.textContent='⏱ Calcul du temps restant…';
-    else etaEl.textContent=`⏱ Temps restant estimé : ~${fmtTime(eta)}`;
-  }
-  if($('ultraStarPreconvertActive'))$('ultraStarPreconvertActive').innerHTML=[...active.values()].map(x=>{
-    const e=activeEta(x),extra=e==null?'':' · ~'+fmtTime(e)+' restante'+(e>=2?'s':'');
-    return `<div style="padding:6px 8px;border:1px solid #1c334d;border-radius:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span><b>${x.p}%</b></div><div class="muted" style="font-size:11px">${esc(x.label)}${extra}</div></div>`
-  }).join('')
+  if($('ultraStarPreconvertPool'))$('ultraStarPreconvertPool').textContent=run?.paused?`Conversions arrêtées · ${queued+running} restante${queued+running>1?'s':''}`:`${running} active${running>1?'s':''} / ${n} autorisée${n>1?'s':''}${queued?` · ${queued} en attente`:''}`;
+  const eta=$('ultraStarPreconvertEta');if(eta){if(run?.paused)eta.textContent='⏸ Temps restant suspendu';else if(total&&done>=total)eta.textContent='✅ Préparation terminée';else{const e=globalEta();eta.textContent=e==null?'⏱ Calcul du temps restant…':`⏱ Temps restant estimé : ~${fmtTime(e)}`}}
+  const life=$('ultraStarLifecycle');if(life){if(document.hidden&&run&&!run.paused)life.textContent='⚠️ Onglet en arrière-plan : Chrome peut ralentir les conversions. Elles seront mises en pause proprement si la page est gelée.';else if(run?.pauseReason==='lifecycle')life.textContent='⏸ Chrome a suspendu la page : conversions mises en pause sans perdre celles déjà terminées.';else if(run&&!run.finished)life.textContent='ℹ️ Les conversions déjà terminées restent en cache même si tu arrêtes ou recharges la page.';else life.textContent=''}
+  if($('ultraStarPreconvertActive'))$('ultraStarPreconvertActive').innerHTML=[...active.values()].map(x=>{const e=activeEta(x);return `<div style="padding:6px 8px;border:1px solid #1c334d;border-radius:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span><b>${x.p}%</b></div><div class="muted" style="font-size:11px">${esc(x.label)}${e!=null?` · ~${esc(fmtTime(e))} restante${e>1?'s':''}`:''}</div></div>`}).join('');
+  updateControls();
 }
-function progress(f,label,p){
-  const k=key(f),now=Date.now(),old=active.get(k),ph=phase(label);
-  let startedAt=old?.startedAt||now,phaseStartedAt=old?.phaseStartedAt||now;
-  if(!old||old.phase!==ph||(old.p!=null&&p<old.p-15))phaseStartedAt=now;
-  active.set(k,{name:f.name,label,p:Math.max(0,Math.min(100,Math.round(p||0))),startedAt,phaseStartedAt,phase:ph,size:f.size||0});
-  paint()
-}
-function applyConcurrency(){if(currentRun&&currentRun.token===token){paint(`Limite modifiée : ${concurrency()} conversion${concurrency()>1?'s':''} simultanée${concurrency()>1?'s':''}`);currentRun.pump()}}
-function settings(){if($('videoConcurrency'))return;const s=$('settings');if(!s)return;const d=document.createElement('div');d.innerHTML='<hr><h3>🎬 Conversion vidéo UltraStar</h3><p class="muted">Nombre de vidéos incompatibles préparées en même temps. Le changement est appliqué immédiatement à la file en cours.</p><div class="controls wrap" style="justify-content:flex-start"><label for="videoConcurrency">Conversions simultanées</label><select id="videoConcurrency"><option value="1">1 · Économie</option><option value="2">2 · Recommandé</option><option value="3">3 · Rapide</option><option value="4">4 · Très rapide</option></select><span id="videoConcurrencyHint" class="status"></span></div>';s.appendChild(d);const sel=$('videoConcurrency'),hint=$('videoConcurrencyHint'),sync=()=>{sel.value=String(concurrency());hint.textContent=`${concurrency()} à la fois`};sel.onchange=()=>{setConcurrency(sel.value);sync();applyConcurrency()};sync()}
+function progress(f,label,p){const k=key(f),old=active.get(k),ph=phase(label),oldPh=phase(old?.label||'');active.set(k,{name:f.name,label,p:Math.max(0,Math.min(100,Math.round(p||0))),size:f.size||0,startedAt:old?.startedAt||Date.now(),phaseStartedAt:(!old||ph!==oldPh)?Date.now():(old.phaseStartedAt||Date.now())});paint()}
+function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{if(currentRun&&!currentRun.finished)paint()},1000)}
+function stopTicker(){clearInterval(ticker);ticker=0}
+function settings(){if($('videoConcurrency'))return;const s=$('settings');if(!s)return;const d=document.createElement('div');d.innerHTML='<hr><h3>🎬 Conversion vidéo UltraStar</h3><p class="muted">Nombre de vidéos incompatibles préparées en même temps. Le changement est appliqué immédiatement à la file en cours.</p><div class="controls wrap" style="justify-content:flex-start"><label for="videoConcurrency">Conversions simultanées</label><select id="videoConcurrency"><option value="1">1 · Économie</option><option value="2">2 · Recommandé</option><option value="3">3 · Rapide</option><option value="4">4 · Très rapide</option></select><span id="videoConcurrencyHint" class="status"></span></div>';s.appendChild(d);const sel=$('videoConcurrency'),hint=$('videoConcurrencyHint'),sync=()=>{sel.value=String(concurrency());hint.textContent=`${concurrency()} à la fois`};sel.onchange=()=>{setConcurrency(sel.value);sync();if(currentRun&&!currentRun.paused)currentRun.pump();paint(`Limite modifiée : ${concurrency()} conversion${concurrency()>1?'s':''} simultanée${concurrency()>1?'s':''}`)};sync()}
 function playable(blob,ms=3500){return new Promise(r=>{const v=document.createElement('video'),u=URL.createObjectURL(blob);let x=0;const end=ok=>{if(x)return;x=1;clearTimeout(t);v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(u);r(ok)},t=setTimeout(()=>end(v.readyState>=1),ms);v.preload='metadata';v.muted=true;v.onloadedmetadata=()=>end(true);v.oncanplay=()=>end(true);v.onerror=()=>end(false);v.src=u;v.load()})}
-async function convert(f,mode,cb){const w=new Worker(WORKER),job='pre-'+Date.now()+'-'+Math.random(),buf=await f.arrayBuffer();return new Promise(r=>{let x=0;const end=v=>{if(x)return;x=1;try{w.terminate()}catch(e){}r(v)};w.onmessage=e=>{const d=e.data||{};if(d.job!==job)return;if(d.type==='progress')cb(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));else if(d.type==='done')end(new Blob([d.buffer],{type:'video/mp4'}));else if(d.type==='error')end(null)};w.onerror=()=>end(null);w.postMessage({type:'convert',job,name:f.name,mode,buffer:buf},[buf])})}
+function cancelWorker(k){const task=workerTasks.get(k);if(task)task.cancel()}
+function cancelAllWorkers(){for(const task of [...workerTasks.values()])task.cancel()}
+async function convert(f,mode,cb,run){const w=new Worker(WORKER),job='pre-'+Date.now()+'-'+Math.random(),buf=await f.arrayBuffer(),k=key(f);return new Promise(r=>{let x=0;const end=(v,cancelled=false)=>{if(x)return;x=1;workerTasks.delete(k);try{w.terminate()}catch(e){}r(cancelled?{cancelled:true}:v)};workerTasks.set(k,{worker:w,cancel:()=>end(null,true)});w.onmessage=e=>{const d=e.data||{};if(d.job!==job)return;if(d.type==='progress')cb(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));else if(d.type==='done')end(new Blob([d.buffer],{type:'video/mp4'}));else if(d.type==='error')end(null)};w.onerror=()=>end(null);if(run.paused||run.finished)return end(null,true);w.postMessage({type:'convert',job,name:f.name,mode,buffer:buf},[buf])})}
 async function videos(list){const fs=[...list],txt=fs.filter(f=>/\.txt$/i.test(f.name)),out=[];for(const tf of txt)try{const meta={},text=await tf.text();for(const l of text.split(/\r?\n/))if(l[0]==='#'&&l.includes(':')){const i=l.indexOf(':');meta[l.slice(1,i).toUpperCase()]=l.slice(i+1).trim()}const dir=(tf.webkitRelativePath||tf.name).split('/').slice(0,-1).join('/'),wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop(),same=f=>(f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir,c=(wanted&&fs.find(f=>same(f)&&f.name.toLowerCase()===wanted.toLowerCase()))||fs.find(f=>same(f)&&RX.test(f.name));if(c)out.push(c)}catch(e){}const m=new Map;out.forEach(f=>m.set(key(f),f));return[...m.values()]}
-async function one(f,t){
-  if(t!==token)return{status:'cancel'};
-  progress(f,'Vérification…',4);
-  if(await cached(f)){progress(f,'Déjà en cache',100);return{status:'cached'}}
-  if(await playable(f)){progress(f,'Compatible directement',100);return{status:'native'}}
-  let b=await convert(f,'remux',p=>progress(f,'Adaptation rapide…',p));
-  if(b&&await playable(b)){await cache(f,b);progress(f,'Adaptée ✓',100);return{status:'converted'}}
-  if(t!==token)return{status:'cancel'};
-  b=await convert(f,'transcode',p=>progress(f,'Conversion MP4 H.264/AAC…',p));
-  if(b&&await playable(b)){await cache(f,b);progress(f,'Convertie ✓',100);return{status:'converted'}}
-  progress(f,'Échec automatique',100);return{status:'failed'}
+async function one(f,run){if(run.token!==token||run.finished)return{status:'cancel'};if(run.paused)return{status:'paused'};progress(f,'Vérification…',4);if(await cached(f)){progress(f,'Déjà en cache',100);return{status:'cached'}}if(run.paused)return{status:'paused'};if(await playable(f)){progress(f,'Compatible directement',100);return{status:'native'}}if(run.paused)return{status:'paused'};let b=await convert(f,'remux',p=>progress(f,'Adaptation rapide…',p),run);if(b?.cancelled)return{status:'paused'};if(b&&await playable(b)){await cache(f,b);progress(f,'Adaptée ✓',100);return{status:'converted'}}if(run.paused||run.token!==token)return{status:'paused'};b=await convert(f,'transcode',p=>progress(f,'Conversion MP4 H.264/AAC…',p),run);if(b?.cancelled)return{status:'paused'};if(b&&await playable(b)){await cache(f,b);progress(f,'Convertie ✓',100);return{status:'converted'}}if(run.paused)return{status:'paused'};progress(f,'Échec automatique',100);return{status:'failed'}}
+function settleEntry(e,result){if(e.settled)return;e.settled=true;e.resolve(result);jobs.delete(key(e.f))}
+function abortRun(run){if(!run||run.finished)return;run.finished=true;run.paused=false;cancelAllWorkers();for(const e of run.entries)if(!e.settled)settleEntry(e,{status:'cancel'});run.queue.length=0;active.clear();run.running=0;run.finishResolve?.();if(currentRun===run)currentRun=null;stopTicker()}
+function pauseRun(reason='user'){
+  const run=currentRun;if(!run||run.finished||run.paused)return;run.paused=true;run.pauseReason=reason;cancelAllWorkers();paint(reason==='user'?'⏹ Conversions arrêtées. Clique sur Reprendre pour continuer.':'⏸ Conversions mises en pause par Chrome.');
 }
+function resumeRun(auto=false){const run=currentRun;if(!run||run.finished||!run.paused)return;if(run.pauseReason==='user'&&auto)return;run.paused=false;run.pauseReason='';paint('▶ Reprise des conversions…');run.pump();startTicker()}
+function bindControlButtons(){const stop=$('ultraStarStopConversions'),resume=$('ultraStarResumeConversions');if(stop&&!stop.dataset.bound){stop.dataset.bound='1';stop.onclick=()=>pauseRun('user')}if(resume&&!resume.dataset.bound){resume.dataset.bound='1';resume.onclick=()=>resumeRun(false)}}
 async function start(list){
-  const t=++token,fs=await videos(list);if(t!==token)return;
-  total=fs.length;done=0;active.clear();
-  if(ticker){clearInterval(ticker);ticker=0}
+  if(currentRun)abortRun(currentRun);const t=++token,fs=await videos(list);if(t!==token)return;total=fs.length;done=0;active.clear();
   if(!total){currentRun=null;paint('Aucune vidéo UltraStar à préparer.');return}
-  const stats={native:0,cached:0,converted:0,failed:0},entries=fs.map(f=>{let resolve;const promise=new Promise(r=>resolve=r);jobs.set(key(f),promise);return{f,resolve}});
-  let finishResolve;const finished=new Promise(r=>finishResolve=r);
-  const run={token:t,entries,next:0,running:0,finished:false,pump:null,durations:[],startedAt:Date.now()};currentRun=run;
-  ticker=setInterval(()=>{if(currentRun===run&&!run.finished)paint()},1000);
-  const finishIfDone=()=>{if(run.finished||t!==token)return;if(done>=total&&run.running===0){run.finished=true;if(ticker){clearInterval(ticker);ticker=0}currentRun=null;active.clear();paint(`Terminé · ${stats.native} compatible${stats.native>1?'s':''} · ${stats.converted} préparée${stats.converted>1?'s':''} · ${stats.cached} en cache${stats.failed?` · ${stats.failed} échec${stats.failed>1?'s':''}`:''}`);finishResolve()}};
-  const launch=e=>{
-    run.running++;const jobStart=Date.now();progress(e.f,'Démarrage…',1);
-    (async()=>{
-      let r;try{r=await one(e.f,t)}catch(err){console.error(err);r={status:'failed'}}
-      const duration=(Date.now()-jobStart)/1000;if(Number.isFinite(duration)&&duration>0)run.durations.push(duration);
-      if(stats[r?.status]!==undefined)stats[r.status]++;
-      done++;e.resolve(r);jobs.delete(key(e.f));active.delete(key(e.f));run.running--;
-      paint(`Préparation en cours · ${done}/${total} terminée${done>1?'s':''}`);run.pump();finishIfDone()
-    })()
-  };
-  run.pump=()=>{if(t!==token||run.finished)return;const wanted=concurrency();while(run.running<wanted&&run.next<run.entries.length){launch(run.entries[run.next++])}paint()};
-  paint(`Analyse de ${total} vidéo${total>1?'s':''} · jusqu’à ${concurrency()} en parallèle`);
-  run.pump();finishIfDone();await finished
+  const stats={native:0,cached:0,converted:0,failed:0},entries=fs.map(f=>{let resolve;const promise=new Promise(r=>resolve=r),e={f,resolve,promise,settled:false,queued:false,startedAt:0};jobs.set(key(f),promise);return e});let finishResolve;const finished=new Promise(r=>finishResolve=r);
+  const run={token:t,entries,queue:[...entries],running:0,finished:false,paused:false,pauseReason:'',history:[],finishResolve,pump:null};currentRun=run;
+  const finishIfDone=()=>{if(run.finished||t!==token)return;if(done>=total&&run.running===0&&run.queue.length===0){run.finished=true;active.clear();stopTicker();paint(`Terminé · ${stats.native} compatible${stats.native>1?'s':''} · ${stats.converted} préparée${stats.converted>1?'s':''} · ${stats.cached} en cache${stats.failed?` · ${stats.failed} échec${stats.failed>1?'s':''}`:''}`);finishResolve()}};
+  const launch=e=>{run.running++;e.queued=false;e.startedAt=Date.now();progress(e.f,'Démarrage…',1);(async()=>{let r;try{r=await one(e.f,run)}catch(err){console.error(err);r={status:run.paused?'paused':'failed'}}const elapsed=(Date.now()-e.startedAt)/1000;active.delete(key(e.f));run.running--;if(r?.status==='paused'&&!run.finished){if(!e.settled&&!e.queued){e.queued=true;run.queue.unshift(e)}}else if(r?.status==='cancel'){settleEntry(e,r)}else{if(stats[r?.status]!==undefined)stats[r.status]++;if(r?.status==='converted'&&elapsed>2)run.history.push(elapsed);done++;settleEntry(e,r)}paint(`Préparation en cours · ${done}/${total} terminée${done>1?'s':''}`);run.pump();finishIfDone()})()};
+  run.pump=()=>{if(t!==token||run.finished||run.paused)return;const wanted=concurrency();while(run.running<wanted&&run.queue.length){const e=run.queue.shift();if(e.settled)continue;launch(e)}paint()};
+  paint(`Analyse de ${total} vidéo${total>1?'s':''} · jusqu’à ${concurrency()} en parallèle`);startTicker();run.pump();finishIfDone();await finished
 }
-const old=window.setUltraStarStageVideo;if(typeof old==='function')window.setUltraStarStageVideo=function(track){const f=track?.compatVideoBlob||track?.videoBlob,p=f&&jobs.get(key(f));if(p){if($('state'))$('state').textContent='🎬 Vidéo en cours de préparation…';p.finally(()=>old(track));return}return old(track)};
-settings();document.addEventListener('DOMContentLoaded',settings,{once:true});const f=$('ultraStarFolder');if(f)f.addEventListener('change',e=>start(e.target.files));const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.26.4 · UltraStar 🎤';
-window.KaraokeWorldVideoPreconvert={version:'0.26.4',getConcurrency:concurrency,setConcurrency:n=>{setConcurrency(n);applyConcurrency()},waitForFile:f=>jobs.get(key(f))||Promise.resolve(),isPreparing:f=>jobs.has(key(f))};
+
+/* Dossier UltraStar mémorisé */
+function openHandleDB(){return new Promise((res,rej)=>{const q=indexedDB.open(HANDLE_DB,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains(HANDLE_STORE))q.result.createObjectStore(HANDLE_STORE)};q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function handleGet(){const d=await openHandleDB();return await new Promise((res,rej)=>{const q=d.transaction(HANDLE_STORE).objectStore(HANDLE_STORE).get(HANDLE_KEY);q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error)})}
+async function handleSet(h){const d=await openHandleDB();return await new Promise((res,rej)=>{const q=d.transaction(HANDLE_STORE,'readwrite').objectStore(HANDLE_STORE).put(h,HANDLE_KEY);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+async function handleDelete(){const d=await openHandleDB();return await new Promise((res,rej)=>{const q=d.transaction(HANDLE_STORE,'readwrite').objectStore(HANDLE_STORE).delete(HANDLE_KEY);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+function folderUI(){
+  let c=$('ultraStarFolderMemory');if(c)return c;const panel=$('ultrastarPanel');if(!panel)return null;c=document.createElement('div');c.id='ultraStarFolderMemory';c.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#09182a';
+  c.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>📁 Dossier UltraStar mémorisé</b><span id="ultraStarFolderMemoryBadge" class="status">Non connecté</span></div><p id="ultraStarFolderMemoryText" class="muted" style="margin:7px 0">Connecte ton dossier une fois : KaraokeWorld pourra le retrouver après une mise à jour.</p><div class="controls wrap" style="justify-content:flex-start"><button id="ultraStarConnectFolder" type="button">🔗 Connecter mon dossier</button><button id="ultraStarGrantFolder" class="secondary hidden" type="button">🔓 Autoriser l’accès</button><button id="ultraStarRefreshFolder" class="secondary hidden" type="button">🔄 Actualiser le dossier</button><button id="ultraStarForgetFolder" class="secondary hidden" type="button">✕ Oublier le dossier</button></div>';
+  panel.insertBefore(c,$('ultraStarPreconvert')||null);bindFolderButtons();return c
+}
+function folderStatus(text,badge=''){folderUI();if($('ultraStarFolderMemoryText'))$('ultraStarFolderMemoryText').textContent=text;if(badge&&$('ultraStarFolderMemoryBadge'))$('ultraStarFolderMemoryBadge').textContent=badge;const has=!!rememberedHandle;if($('ultraStarRefreshFolder'))$('ultraStarRefreshFolder').classList.toggle('hidden',!has);if($('ultraStarForgetFolder'))$('ultraStarForgetFolder').classList.toggle('hidden',!has)}
+async function permission(h,request=false){if(!h)return'denied';try{if(await h.queryPermission({mode:'read'})==='granted')return'granted';if(request)return await h.requestPermission({mode:'read'});return'prompt'}catch(e){return'denied'}}
+function pathFile(file,path){try{Object.defineProperty(file,'webkitRelativePath',{value:path,configurable:true});return file}catch(e){const f=new File([file],file.name,{type:file.type,lastModified:file.lastModified});try{Object.defineProperty(f,'webkitRelativePath',{value:path,configurable:true})}catch(_){}return f}}
+async function readDirectory(root){const out=[];async function walk(dir,rel){const tasks=[];for await(const [name,h] of dir.entries()){const p=rel?`${rel}/${name}`:name;if(h.kind==='directory')tasks.push(walk(h,p));else tasks.push(h.getFile().then(f=>out.push(pathFile(f,`${root.name}/${p}`))))}await Promise.all(tasks)}await walk(root,'');return out}
+async function waitApp(){const started=Date.now();while(Date.now()-started<6000){try{if(typeof tracks!=='undefined'&&Array.isArray(tracks)&&tracks.length>=8&&typeof importUltraStarFolder==='function')return true}catch(e){}await new Promise(r=>setTimeout(r,100))}return typeof importUltraStarFolder==='function'}
+async function enrichTracks(files){const txts=files.filter(f=>/\.txt$/i.test(f.name));for(const tf of txts)try{const meta={},text=await tf.text();for(const l of text.split(/\r?\n/))if(l[0]==='#'&&l.includes(':')){const i=l.indexOf(':');meta[l.slice(1,i).toUpperCase()]=l.slice(i+1).trim()}const artist=meta.ARTIST||'Artiste inconnu',title=meta.TITLE||tf.name.replace(/\.txt$/i,''),dir=tf.webkitRelativePath.split('/').slice(0,-1).join('/'),wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop(),same=f=>f.webkitRelativePath.split('/').slice(0,-1).join('/')===dir,c=(wanted&&files.find(f=>same(f)&&f.name.toLowerCase()===wanted.toLowerCase()))||files.find(f=>same(f)&&RX.test(f.name));if(!c)continue;const tr=tracks.find(t=>t.kind==='ultrastar'&&norm(`${t.artist}|${t.title}`)===norm(`${artist}|${title}`));if(tr){tr.videoBlob=c;tr.compatVideoBlob=c;tr.videoName=c.name}}catch(e){console.warn('KaraokeWorld association vidéo mémorisée',e)}}
+async function scanRemembered({request=false,automatic=false}={}){
+  if(folderScanBusy||!rememberedHandle)return;const p=await permission(rememberedHandle,request);const grant=$('ultraStarGrantFolder');if(grant)grant.classList.toggle('hidden',p==='granted');
+  if(p!=='granted'){folderStatus(`Dossier mémorisé : ${rememberedHandle.name}. Clique sur « Autoriser l’accès » pour le recharger.`,rememberedHandle.name);return}
+  folderScanBusy=true;folderStatus(`Lecture de « ${rememberedHandle.name} »…`,rememberedHandle.name);
+  try{await waitApp();const files=await readDirectory(rememberedHandle);folderStatus(`${files.length} fichiers détectés · import UltraStar en cours…`,rememberedHandle.name);await importUltraStarFolder(files);await enrichTracks(files);folderStatus(`✅ ${rememberedHandle.name} chargé automatiquement${automatic?' après la mise à jour':''}.`,rememberedHandle.name);start(files)}catch(e){console.error(e);folderStatus(`Impossible de relire le dossier : ${e.message||e}`,rememberedHandle.name)}finally{folderScanBusy=false}
+}
+function bindFolderButtons(){
+  const connect=$('ultraStarConnectFolder'),grant=$('ultraStarGrantFolder'),refresh=$('ultraStarRefreshFolder'),forget=$('ultraStarForgetFolder');
+  if(connect&&!connect.dataset.bound){connect.dataset.bound='1';connect.onclick=async()=>{if(!window.showDirectoryPicker){folderStatus('Ce navigateur ne permet pas de mémoriser un dossier. Utilise le bouton UltraStar classique.','Non compatible');return}try{const h=await window.showDirectoryPicker({id:'karaokeworld-ultrastar',mode:'read'});rememberedHandle=h;await handleSet(h);folderStatus(`Dossier connecté : ${h.name}`,h.name);await scanRemembered({request:false})}catch(e){if(e?.name!=='AbortError')folderStatus(`Connexion impossible : ${e.message||e}`)}}}
+  if(grant&&!grant.dataset.bound){grant.dataset.bound='1';grant.onclick=()=>scanRemembered({request:true})}
+  if(refresh&&!refresh.dataset.bound){refresh.dataset.bound='1';refresh.onclick=()=>scanRemembered({request:true})}
+  if(forget&&!forget.dataset.bound){forget.dataset.bound='1';forget.onclick=async()=>{if(currentRun)pauseRun('user');await handleDelete();rememberedHandle=null;folderStatus('Dossier oublié. Tu peux en connecter un autre.','Non connecté');grant.classList.add('hidden');refresh.classList.add('hidden');forget.classList.add('hidden')}}
+}
+async function restoreFolder(){folderUI();if(!window.showDirectoryPicker){folderStatus('La mémorisation automatique du dossier n’est pas disponible dans ce navigateur.','Non compatible');return}try{rememberedHandle=await handleGet()}catch(e){rememberedHandle=null}if(!rememberedHandle){folderStatus('Connecte ton dossier une fois : KaraokeWorld pourra le retrouver après une mise à jour.','Non connecté');return}folderStatus(`Dossier mémorisé : ${rememberedHandle.name}`,rememberedHandle.name);const p=await permission(rememberedHandle,false);if(p==='granted')scanRemembered({automatic:true});else{const g=$('ultraStarGrantFolder');if(g)g.classList.remove('hidden');folderStatus(`Dossier mémorisé : ${rememberedHandle.name}. Une autorisation suffit pour le recharger.`,rememberedHandle.name)}}
+
+/* Lecture d’une vidéo en cours de préparation */
+const old=window.setUltraStarStageVideo;if(typeof old==='function')window.setUltraStarStageVideo=function(track){const f=track?.compatVideoBlob||track?.videoBlob,p=f&&jobs.get(key(f));if(p){if(currentRun?.paused){if($('state'))$('state').textContent='⏹ Conversions arrêtées · audio + paroles disponibles';return}if($('state'))$('state').textContent='🎬 Vidéo en cours de préparation…';p.finally(()=>{if(!currentRun?.paused)old(track)});return}return old(track)};
+
+/* Onglet en arrière-plan / cycle de vie */
+document.addEventListener('visibilitychange',()=>{if(document.hidden){backgroundSince=Date.now();paint()}else{if(backgroundSince&&currentRun&&!currentRun.finished){const sec=Math.round((Date.now()-backgroundSince)/1000);paint(`Onglet de nouveau actif${sec>2?` après ${fmtTime(sec)}`:''}.`)}backgroundSince=0;if(currentRun?.pauseReason==='lifecycle')resumeRun(true);else paint()}});
+document.addEventListener('freeze',()=>{if(currentRun&&!currentRun.paused)pauseRun('lifecycle')});
+document.addEventListener('resume',()=>{if(currentRun?.pauseReason==='lifecycle')resumeRun(true)});
+window.addEventListener('pageshow',()=>{if(currentRun?.pauseReason==='lifecycle')resumeRun(true)});
+
+settings();folderUI();box();document.addEventListener('DOMContentLoaded',()=>{settings();folderUI();box();restoreFolder()},{once:true});if(document.readyState!=='loading')restoreFolder();
+const input=$('ultraStarFolder');if(input)input.addEventListener('change',e=>start(e.target.files));
+const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.26.5 · UltraStar 🎤';
+window.KaraokeWorldVideoPreconvert={version:'0.26.5',getConcurrency:concurrency,setConcurrency:n=>{setConcurrency(n);if(currentRun&&!currentRun.paused)currentRun.pump();paint()},stopAll:()=>pauseRun('user'),resumeAll:()=>resumeRun(false),refreshRememberedFolder:()=>scanRemembered({request:true}),waitForFile:f=>jobs.get(key(f))||Promise.resolve(),isPreparing:f=>jobs.has(key(f))};
 })();
