@@ -1,5 +1,5 @@
-const CACHE="karaokeworld-v0.27.6-vocals";
-const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./recently-sung.js","./song-covers.js","./youtube-lrclib-smart-match.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-preconvert-v0261.js","./video-compat-worker-v0260.js","./cloud-ultrastar-v0266.js","./public-starter-v0266.js","./hotfix-v0267.js","./video-once-v0272.js","./library-dedupe-v0275.js","./vocal-separation-v0276.js","./manifest.webmanifest"];
+const CACHE="karaokeworld-v0.27.7-voice-button-fix";
+const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./recently-sung.js","./song-covers.js","./youtube-lrclib-smart-match.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-preconvert-v0261.js","./video-compat-worker-v0260.js","./cloud-ultrastar-v0266.js","./public-starter-v0266.js","./hotfix-v0267.js","./video-once-v0272.js","./library-dedupe-v0275.js","./vocal-separation-v0276.js","./vocal-button-fix-v0277.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 const PRESERVE=new Set(["karaokeworld-converted-video-v1","karaokeworld-instrumental-v1","web-demix2-models"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
