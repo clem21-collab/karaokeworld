@@ -3,8 +3,6 @@
   const VERSION='0.26.7';
   const $=id=>document.getElementById(id);
 
-  /* Les boutons UltraStar sont créés dynamiquement. On intercepte donc les clics
-     au niveau du document pour qu'ils fonctionnent même après reconstruction UI. */
   document.addEventListener('click',e=>{
     const target=e.target?.closest?.('#ultraStarStopConversions,#ultraStarResumeConversions');
     if(!target)return;
@@ -58,7 +56,21 @@
     }catch(e){console.warn('Correctif Firebase Auth non chargé',e)}
   }
 
-  function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.26.7 · UltraStar 🎤'}
-  function start(){markVersion();patchGoogleAuth();setTimeout(patchGoogleAuth,1200);setTimeout(patchGoogleAuth,3000)}
+  function markVersion(){
+    const small=document.querySelector('.brand small');
+    if(small&&small.textContent!==' BETA · v0.26.7 · UltraStar 🎤')small.textContent=' BETA · v0.26.7 · UltraStar 🎤';
+  }
+  function start(){
+    markVersion();
+    patchGoogleAuth();
+    setTimeout(markVersion,250);
+    setTimeout(markVersion,800);
+    setTimeout(markVersion,1600);
+    setTimeout(markVersion,3000);
+    setTimeout(patchGoogleAuth,1200);
+    setTimeout(patchGoogleAuth,3000);
+    const brand=document.querySelector('.brand');
+    if(brand)new MutationObserver(markVersion).observe(brand,{childList:true,subtree:true,characterData:true});
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
