@@ -31,12 +31,20 @@
 // Ne plus le charger ici : deux instances créaient deux files de conversion concurrentes.
 (()=>{
   function loadFix(){
-    if(document.querySelector('script[data-kw-v0267]'))return;
-    const s=document.createElement('script');
-    s.src='./hotfix-v0267.js?v=0267';
-    s.async=false;
-    s.dataset.kwV0267='1';
-    document.body.appendChild(s);
+    if(!document.querySelector('script[data-kw-v0267]')){
+      const s=document.createElement('script');
+      s.src='./hotfix-v0267.js?v=0275';
+      s.async=false;
+      s.dataset.kwV0267='1';
+      document.body.appendChild(s);
+    }
+    if(!document.querySelector('script[data-kw-dedupe-v0275]')){
+      const d=document.createElement('script');
+      d.src='./library-dedupe-v0275.js?v=0275';
+      d.async=false;
+      d.dataset.kwDedupeV0275='1';
+      document.body.appendChild(d);
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadFix);else loadFix();
 })();
