@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.26.6 — bibliothèque UltraStar privée dans Firebase Storage */
+/* KaraokeWorld v0.26.9 — bibliothèque UltraStar privée dans Firebase Storage */
 (()=>{
-const VERSION='0.26.6';
+const VERSION='0.26.9';
 const AUDIO_RX=/\.(mp3|ogg|m4a|wav|aac|flac|opus)$/i;
 const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
 const COVER_RX=/\.(jpg|jpeg|png|webp)$/i;
@@ -10,9 +10,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const safe=s=>String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,70)||'titre';
 function html(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function shortHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(16)}
+function fmtBytes(n){n=Number(n||0);if(n<1024)return `${Math.round(n)} o`;if(n<1024*1024)return `${(n/1024).toFixed(1)} Ko`;if(n<1024*1024*1024)return `${(n/1024/1024).toFixed(1)} Mo`;return `${(n/1024/1024/1024).toFixed(2)} Go`}
+function roleName(role){return role==='txt'?'Paroles':role==='audio'?'Audio':role==='video'?'Vidéo':role==='cover'?'Jaquette':role}
 function status(text,kind=''){const el=$id('cloudUltraStarStatus');if(el){el.textContent=text;el.dataset.kind=kind}}
 function progress(pct,text){const bar=$id('cloudUltraStarBar');if(bar)bar.style.width=Math.max(0,Math.min(100,pct||0))+'%';if(text)status(text)}
 function user(){try{return cloudUser||auth?.currentUser||null}catch(e){return auth?.currentUser||null}}
+function setBusy(on){const up=$id('cloudUltraStarUpload'),reload=$id('cloudUltraStarReload');if(up){up.disabled=!!on;up.textContent=on?'☁ Envoi en cours…':'☁ Envoyer un dossier dans le cloud'}if(reload)reload.disabled=!!on}
 function ensureUI(){
   if($id('cloudUltraStarBox'))return;
   const panel=$id('ultrastarPanel');if(!panel)return;
@@ -83,33 +86,47 @@ function uploadOne(refObj,file,onPct){
   });
 }
 async function uploadFolder(fileList){
-  if(loading)return;loading=true;
+  if(loading)return;loading=true;setBusy(true);
   try{
     await waitForCloud();const u=user();if(!u)throw new Error('Connecte-toi avec Google avant l’envoi.');
     const songs=await buildSongs(fileList);if(!songs.length)throw new Error('Aucune chanson UltraStar complète trouvée dans ce dossier.');
     const allAssets=songs.flatMap(s=>[s.tf,s.audio,s.video,s.cover].filter(Boolean));
-    const totalBytes=allAssets.reduce((n,f)=>n+(f.size||0),0)||1;let completed=0;
-    progress(0,`Préparation de ${songs.length} chanson${songs.length>1?'s':''}…`);
+    const totalBytes=allAssets.reduce((n,f)=>n+(f.size||0),0)||1;
+    let completedBytes=0,doneSongs=0;
+    const badge=$id('cloudUltraStarBadge');
+    progress(0,`Préparation de ${songs.length} chanson${songs.length>1?'s':''} · ${fmtBytes(totalBytes)} à envoyer…`);
     for(let i=0;i<songs.length;i++){
       const s=songs[i],base=`users/${u.uid}/ultrastar/${s.songId}`,paths={};
       const assets=[['txt',s.tf],['audio',s.audio],['video',s.video],['cover',s.cover]].filter(x=>x[1]);
       for(const [role,file] of assets){
         const path=`${base}/${role}-${file.name.replace(/[\\/]/g,'_')}`;paths[role+'Path']=path;
         const r=sdk.ref(storage,path);
-        await uploadOne(r,file,(sent)=>{
-          const pct=((completed+sent)/totalBytes)*100;
-          progress(pct,`☁ ${i+1}/${songs.length} · ${s.artist} — ${s.title} · ${Math.round(pct)} %`);
+        await uploadOne(r,file,(sent,fileTotal)=>{
+          const filePct=fileTotal?sent/fileTotal*100:100;
+          const totalSent=completedBytes+sent;
+          const totalPct=totalSent/totalBytes*100;
+          progress(totalPct,`☁ Chanson ${i+1}/${songs.length} · ${s.artist} — ${s.title} · ${roleName(role)} ${Math.round(filePct)} % · Total ${totalPct.toFixed(1)} % · ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)} · ✅ ${doneSongs}/${songs.length}`);
         });
-        completed+=file.size||0;
+        completedBytes+=file.size||0;
       }
       const vg=parseFloat(String(s.parsed.meta?.VIDEOGAP||'0').replace(',','.'));
       const manifest={schema:1,title:s.title,artist:s.artist,genre:s.genre,bpm:s.parsed.bpm,gap:s.parsed.gap,videoGap:Number.isFinite(vg)?vg:0,originalDir:s.dir,...paths,updatedAt:Date.now(),createdAt:Date.now()};
       await sdk.setDoc(sdk.doc(fs,'users',u.uid,'ultrastar',s.songId),manifest,{merge:true});
+      doneSongs=i+1;
+      if(badge)badge.textContent=`${doneSongs}/${songs.length} envoyée${doneSongs>1?'s':''}`;
+      const totalPct=completedBytes/totalBytes*100;
+      progress(totalPct,`✅ ${doneSongs}/${songs.length} terminée${doneSongs>1?'s':''} · ${s.artist} — ${s.title} · Total ${totalPct.toFixed(1)} % · ${fmtBytes(completedBytes)} / ${fmtBytes(totalBytes)}`);
     }
-    progress(100,`✅ ${songs.length} chanson${songs.length>1?'s':''} envoyée${songs.length>1?'s':''} dans ta bibliothèque cloud.`);
+    progress(100,`✅ ${songs.length} chanson${songs.length>1?'s':''} envoyée${songs.length>1?'s':''} dans ta bibliothèque cloud · ${fmtBytes(totalBytes)} transférés.`);
     await loadCatalog(true);
-  }catch(e){console.error(e);status('Cloud UltraStar : '+(e?.message||e),'error')}
-  finally{loading=false;const input=$id('cloudUltraStarInput');if(input)input.value=''}
+  }catch(e){
+    console.error(e);
+    const code=String(e?.code||'');
+    status(`Cloud UltraStar : ${code?code+' · ':''}${e?.message||e}`,'error');
+  }finally{
+    loading=false;setBusy(false);
+    const input=$id('cloudUltraStarInput');if(input)input.value='';
+  }
 }
 function clearCloudTracks(){
   try{tracks=tracks.filter(t=>!t.cloudUltraStar);drawTracks();drawPlaylists()}catch(e){}
