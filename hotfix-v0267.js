@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.26.8 — conversions, connexion Google et diagnostic Cloud Storage */
+/* KaraokeWorld v0.26.9 — conversions, connexion Google et diagnostic Cloud Storage */
 (()=>{
-  const VERSION='0.26.8';
+  const VERSION='0.26.9';
   const $=id=>document.getElementById(id);
 
   document.addEventListener('click',e=>{
@@ -83,7 +83,7 @@
 
   function markVersion(){
     const small=document.querySelector('.brand small');
-    if(small&&small.textContent!==' BETA · v0.26.8 · UltraStar 🎤')small.textContent=' BETA · v0.26.8 · UltraStar 🎤';
+    if(small&&small.textContent!==' BETA · v0.26.9 · UltraStar 🎤')small.textContent=' BETA · v0.26.9 · UltraStar 🎤';
   }
   function start(){
     markVersion();patchGoogleAuth();watchStorageStatus();
