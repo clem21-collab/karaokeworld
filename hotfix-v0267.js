@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.27.2 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
+/* KaraokeWorld v0.27.3 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
 (()=>{
-  const VERSION='0.27.2';
+  const VERSION='0.27.3';
   const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
@@ -72,7 +72,7 @@
   }
   function uploadRunning(){
     const b=$('cloudUltraStarUpload'),s=$('cloudUltraStarStatus');
-    return /Envoi vers Drive/i.test(b?.textContent||'')||/Préparation de \d+ chanson|Chanson \d+\/\d+|✅ \d+\/\d+ terminée/i.test(s?.textContent||'');
+    return /Envoi(?: parallèle)? vers Drive/i.test(b?.textContent||'')||/Préparation de \d+ chanson|Chanson \d+\/\d+|✅ \d+\/\d+ terminée|Envoi parallèle lancé/i.test(s?.textContent||'');
   }
   function ensureResumeUI(){
     const status=$('cloudUltraStarStatus');if(!status)return null;
@@ -89,7 +89,7 @@
     const cp=readCheckpoint();
     if(!cp?.active){
       box.style.display='block';
-      box.innerHTML='<span class="muted">🛡 Reprise sécurisée active : si Chrome se ferme ou si Internet coupe, relance le même dossier. Les gros fichiers déjà présents sur Drive seront ignorés.</span>';
+      box.innerHTML='<span class="muted">🛡 Reprise sécurisée active : si Chrome se ferme ou si Internet coupe, relance le même dossier. Les fichiers déjà présents sur Drive seront ignorés.</span>';
       return true;
     }
     const done=Math.max(0,Number(cp.done||0)),total=Math.max(0,Number(cp.total||0)),current=Math.max(done,Number(cp.current||0));
@@ -99,7 +99,7 @@
     if(uploadRunning()){
       box.innerHTML=`<b>💾 Reprise sécurisée</b><div class="muted" style="margin-top:4px">Avancement mémorisé : ${done}/${total||'?'} terminé${done>1?'s':''}${label}. Le point de reprise est sauvegardé automatiquement.</div>`;
     }else{
-      box.innerHTML=`<b>⚠️ Envoi précédent interrompu</b><div class="muted" style="margin:4px 0 8px">${done}/${total||'?'} chanson${done>1?'s':''} terminée${done>1?'s':''}${label}. Reprends avec le même dossier : les gros fichiers audio/vidéo déjà envoyés ne seront pas renvoyés.</div><div style="height:6px;background:#172a40;border-radius:99px;overflow:hidden;margin-bottom:8px"><i style="display:block;height:100%;width:${pct.toFixed(1)}%;background:linear-gradient(90deg,#8b5cf6,#38bdf8)"></i></div><button id="driveResumeUpload" type="button">▶ Reprendre l’envoi</button>`;
+      box.innerHTML=`<b>⚠️ Envoi précédent interrompu</b><div class="muted" style="margin:4px 0 8px">${done}/${total||'?'} chanson${done>1?'s':''} terminée${done>1?'s':''}${label}. Reprends avec le même dossier : les fichiers déjà envoyés ne seront pas renvoyés.</div><div style="height:6px;background:#172a40;border-radius:99px;overflow:hidden;margin-bottom:8px"><i style="display:block;height:100%;width:${pct.toFixed(1)}%;background:linear-gradient(90deg,#8b5cf6,#38bdf8)"></i></div><button id="driveResumeUpload" type="button">▶ Reprendre l’envoi</button>`;
       const btn=$('driveResumeUpload');if(btn)btn.onclick=()=>{
         const upload=$('cloudUltraStarUpload'),authBtn=$('cloudDriveAuthorize');
         if(upload&&!upload.disabled){upload.click();return}
@@ -139,11 +139,6 @@
     inspectUploadStatus();renderResumeUI();return true;
   }
 
-  function loadVideoOnce(){
-    if(document.querySelector('script[data-kw-video-once]'))return;
-    const s=document.createElement('script');s.src='./video-once-v0272.js?v=0272';s.async=false;s.dataset.kwVideoOnce='1';document.body.appendChild(s);
-  }
-
   window.addEventListener('beforeunload',e=>{
     if(!readCheckpoint()?.active||!uploadRunning())return;
     e.preventDefault();e.returnValue='';
@@ -151,11 +146,11 @@
 
   function markVersion(){
     const small=document.querySelector('.brand small');
-    if(small&&small.textContent!==' BETA · v0.27.2 · Google Drive ☁️')small.textContent=' BETA · v0.27.2 · Google Drive ☁️';
+    if(small&&small.textContent!==' BETA · v0.27.3 · Google Drive ☁️')small.textContent=' BETA · v0.27.3 · Google Drive ☁️';
   }
   function start(){
-    markVersion();patchGoogleAuth();watchUpload();loadVideoOnce();
-    [250,800,1600,3000,5000].forEach(ms=>setTimeout(()=>{markVersion();patchGoogleAuth();watchUpload();renderResumeUI();loadVideoOnce()},ms));
+    markVersion();patchGoogleAuth();watchUpload();
+    [250,800,1600,3000,5000].forEach(ms=>setTimeout(()=>{markVersion();patchGoogleAuth();watchUpload();renderResumeUI()},ms));
     const brand=document.querySelector('.brand');if(brand)new MutationObserver(markVersion).observe(brand,{childList:true,subtree:true,characterData:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
