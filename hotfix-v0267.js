@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.27.1 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
+/* KaraokeWorld v0.27.2 — conversions, connexion Google, autorisation Drive et reprise d'envoi */
 (()=>{
-  const VERSION='0.27.1';
+  const VERSION='0.27.2';
   const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
@@ -139,6 +139,11 @@
     inspectUploadStatus();renderResumeUI();return true;
   }
 
+  function loadVideoOnce(){
+    if(document.querySelector('script[data-kw-video-once]'))return;
+    const s=document.createElement('script');s.src='./video-once-v0272.js?v=0272';s.async=false;s.dataset.kwVideoOnce='1';document.body.appendChild(s);
+  }
+
   window.addEventListener('beforeunload',e=>{
     if(!readCheckpoint()?.active||!uploadRunning())return;
     e.preventDefault();e.returnValue='';
@@ -146,11 +151,11 @@
 
   function markVersion(){
     const small=document.querySelector('.brand small');
-    if(small&&small.textContent!==' BETA · v0.27.1 · Google Drive ☁️')small.textContent=' BETA · v0.27.1 · Google Drive ☁️';
+    if(small&&small.textContent!==' BETA · v0.27.2 · Google Drive ☁️')small.textContent=' BETA · v0.27.2 · Google Drive ☁️';
   }
   function start(){
-    markVersion();patchGoogleAuth();watchUpload();
-    [250,800,1600,3000,5000].forEach(ms=>setTimeout(()=>{markVersion();patchGoogleAuth();watchUpload();renderResumeUI()},ms));
+    markVersion();patchGoogleAuth();watchUpload();loadVideoOnce();
+    [250,800,1600,3000,5000].forEach(ms=>setTimeout(()=>{markVersion();patchGoogleAuth();watchUpload();renderResumeUI();loadVideoOnce()},ms));
     const brand=document.querySelector('.brand');if(brand)new MutationObserver(markVersion).observe(brand,{childList:true,subtree:true,characterData:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
