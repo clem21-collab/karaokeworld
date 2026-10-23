@@ -27,15 +27,16 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.27.7 — chargeur des correctifs complémentaires.
+// v0.27.8 — chargeur des correctifs complémentaires.
 // Le moteur vidéo principal reste chargé par recently-sung.js pour éviter deux files concurrentes.
 (()=>{
   const addons=[
-    {src:'./hotfix-v0267.js?v=0277',key:'hotfix'},
-    {src:'./video-once-v0272.js?v=0277',key:'video-once'},
-    {src:'./library-dedupe-v0275.js?v=0277',key:'dedupe'},
-    {src:'./vocal-separation-v0276.js?v=0277',key:'vocals'},
-    {src:'./vocal-button-fix-v0277.js?v=0277',key:'voice-button-fix'}
+    {src:'./hotfix-v0267.js?v=0278',key:'hotfix'},
+    {src:'./video-once-v0272.js?v=0278',key:'video-once'},
+    {src:'./library-dedupe-v0275.js?v=0278',key:'dedupe'},
+    {src:'./vocal-separation-v0276.js?v=0278',key:'vocals'},
+    {src:'./vocal-button-fix-v0277.js?v=0278',key:'voice-button-fix'},
+    {src:'./vocal-loudness-v0278.js?v=0278',key:'voice-loudness'}
   ];
   function load(i=0){
     if(i>=addons.length)return;
