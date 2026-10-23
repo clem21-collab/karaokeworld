@@ -1,4 +1,4 @@
-const CACHE="karaokeworld-v0.27.0-google-drive";
+const CACHE="karaokeworld-v0.27.1-drive-resume";
 const FILES=["./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./recently-sung.js","./song-covers.js","./youtube-lrclib-smart-match.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-preconvert-v0261.js","./video-compat-worker-v0260.js","./cloud-ultrastar-v0266.js","./public-starter-v0266.js","./hotfix-v0267.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
