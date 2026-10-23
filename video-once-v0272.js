@@ -1,6 +1,6 @@
-/* KaraokeWorld v0.27.2 — conversion vidéo une seule fois + réutilisation cache/Drive */
+/* KaraokeWorld v0.27.3 — conversion vidéo une seule fois + réutilisation cache/Drive */
 (()=>{
-  const VERSION='0.27.2';
+  const VERSION='0.27.3';
   const CACHE='karaokeworld-converted-video-v1';
   const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
   const $=id=>document.getElementById(id);
@@ -69,7 +69,7 @@
     };
     return true;
   }
-  function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.27.2 · Google Drive ☁️'}
+  function markVersion(){const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.27.3 · Google Drive ☁️'}
   async function start(){
     for(let i=0;i<80;i++){
       attachApi();patchDriveInput();ensureNotice();markVersion();
