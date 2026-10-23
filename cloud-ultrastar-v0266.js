@@ -1,9 +1,10 @@
-/* KaraokeWorld v0.27.0 — bibliothèque UltraStar privée sur Google Drive */
+/* KaraokeWorld v0.27.3 — bibliothèque UltraStar privée sur Google Drive + envoi parallèle */
 (()=>{
-const VERSION='0.27.0';
+const VERSION='0.27.3';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
 const TOKEN_KEY='kw_drive_access_token_v1';
 const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
+const UPLOAD_CONCURRENCY_KEY='kw_drive_upload_concurrency_v1';
 const AUDIO_RX=/\.(mp3|ogg|m4a|wav|aac|flac|opus)$/i;
 const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
 const COVER_RX=/\.(jpg|jpeg|png|webp)$/i;
@@ -18,20 +19,24 @@ function roleName(role){return role==='txt'?'Paroles':role==='audio'?'Audio':rol
 function status(text,kind=''){const el=$id('cloudUltraStarStatus');if(el){el.textContent=text;el.dataset.kind=kind}}
 function progress(pct,text){const bar=$id('cloudUltraStarBar');if(bar)bar.style.width=Math.max(0,Math.min(100,pct||0))+'%';if(text)status(text)}
 function user(){try{return cloudUser||auth?.currentUser||null}catch(e){return auth?.currentUser||null}}
+function uploadConcurrency(){const n=parseInt(localStorage.getItem(UPLOAD_CONCURRENCY_KEY)||'4',10);return Math.max(1,Math.min(4,Number.isFinite(n)?n:4))}
+function setUploadConcurrency(n){localStorage.setItem(UPLOAD_CONCURRENCY_KEY,String(Math.max(1,Math.min(4,parseInt(n,10)||4))))}
 function getDriveToken(){try{const t=sessionStorage.getItem(TOKEN_KEY)||'';const exp=Number(sessionStorage.getItem(TOKEN_EXP_KEY)||0);return t&&exp>Date.now()+30000?t:''}catch(e){return ''}}
 function saveDriveToken(token){try{sessionStorage.setItem(TOKEN_KEY,token);sessionStorage.setItem(TOKEN_EXP_KEY,String(Date.now()+50*60*1000))}catch(e){}driveFolders=null;updateDriveAuthUI()}
 function clearDriveToken(){try{sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(TOKEN_EXP_KEY)}catch(e){}driveFolders=null;updateDriveAuthUI()}
 function setBusy(on){
-  const up=$id('cloudUltraStarUpload'),reload=$id('cloudUltraStarReload'),authBtn=$id('cloudDriveAuthorize');
-  if(up){up.disabled=!!on||!user()||!getDriveToken();up.textContent=on?'☁ Envoi vers Drive…':'☁ Envoyer un dossier sur Drive'}
+  const up=$id('cloudUltraStarUpload'),reload=$id('cloudUltraStarReload'),authBtn=$id('cloudDriveAuthorize'),sel=$id('cloudUploadConcurrency');
+  if(up){up.disabled=!!on||!user()||!getDriveToken();up.textContent=on?'☁ Envoi parallèle vers Drive…':'☁ Envoyer un dossier sur Drive'}
   if(reload)reload.disabled=!!on||!user();
   if(authBtn)authBtn.disabled=!!on||authBusy||!user();
+  if(sel)sel.disabled=!!on;
 }
 function updateDriveAuthUI(){
-  const btn=$id('cloudDriveAuthorize'),up=$id('cloudUltraStarUpload');
+  const btn=$id('cloudDriveAuthorize'),up=$id('cloudUltraStarUpload'),sel=$id('cloudUploadConcurrency');
   const ok=!!getDriveToken(),u=user();
   if(btn){btn.textContent=ok?'✅ Google Drive autorisé':'🔐 Autoriser Google Drive';btn.disabled=authBusy||loading||!u}
   if(up)up.disabled=loading||!u||!ok;
+  if(sel)sel.value=String(uploadConcurrency());
 }
 function ensureUI(){
   if($id('cloudUltraStarBox')){updateDriveAuthUI();return}
@@ -41,15 +46,18 @@ function ensureUI(){
   box.innerHTML=`<div class="row-head"><div><div class="eyebrow">GOOGLE DRIVE · CLOUD PRIVÉ</div><h3 style="margin:2px 0">☁ Ma bibliothèque UltraStar sur Google Drive</h3></div><span id="cloudUltraStarBadge" class="status">Hors ligne</span></div>
   <p class="muted">Les fichiers UltraStar sont stockés dans ton Google Drive/Google One, dans le dossier <b>KaraokeWorld/UltraStar</b>. Firebase conserve seulement le catalogue, les favoris et les playlists.</p>
   <div class="controls wrap"><button id="cloudDriveAuthorize" class="secondary" type="button">🔐 Autoriser Google Drive</button><button id="cloudUltraStarUpload" type="button" disabled>☁ Envoyer un dossier sur Drive</button><button id="cloudUltraStarReload" class="secondary" type="button">🔄 Charger ma bibliothèque Drive</button><input id="cloudUltraStarInput" type="file" webkitdirectory multiple hidden></div>
+  <div class="controls wrap" style="justify-content:flex-start;margin-top:8px"><label for="cloudUploadConcurrency" class="muted">Envois simultanés</label><select id="cloudUploadConcurrency" aria-label="Nombre de chansons envoyées simultanément"><option value="1">1 · Stable</option><option value="2">2 · Modéré</option><option value="3">3 · Rapide</option><option value="4">4 · Maximum</option></select><span id="cloudUploadConcurrencyHint" class="status">4 chansons à la fois</span></div>
   <div style="height:8px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:9px"><i id="cloudUltraStarBar" style="display:block;width:0;height:100%;background:linear-gradient(90deg,#8b5cf6,#38bdf8);transition:width .2s ease"></i></div>
   <p id="cloudUltraStarStatus" class="muted" style="margin:7px 0 0">Connecte-toi avec Google puis autorise Google Drive.</p>
   <div id="cloudUltraStarList" style="display:grid;gap:6px;margin-top:8px"></div>`;
   panel.appendChild(box);
-  const input=$id('cloudUltraStarInput');
+  const input=$id('cloudUltraStarInput'),sel=$id('cloudUploadConcurrency'),hint=$id('cloudUploadConcurrencyHint');
   $id('cloudDriveAuthorize').onclick=authorizeDrive;
   $id('cloudUltraStarUpload').onclick=()=>{if(!user()){status('Connecte-toi d’abord avec Google dans ⚙ Paramètres.');return}if(!getDriveToken()){status('Autorise d’abord Google Drive avec le bouton 🔐.');return}input.click()};
   $id('cloudUltraStarReload').onclick=()=>loadCatalog(true);
   input.onchange=e=>uploadFolder(e.target.files);
+  if(sel){sel.value=String(uploadConcurrency());sel.onchange=()=>{setUploadConcurrency(sel.value);sel.value=String(uploadConcurrency());if(hint)hint.textContent=`${uploadConcurrency()} chanson${uploadConcurrency()>1?'s':''} à la fois`}}
+  if(hint)hint.textContent=`${uploadConcurrency()} chanson${uploadConcurrency()>1?'s':''} à la fois`;
   updateDriveAuthUI();
 }
 async function waitForCloud(){
@@ -106,13 +114,17 @@ async function driveFetch(url,options={}){
 }
 function q(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 async function listDriveFiles(query){
-  const fields='files(id,name,mimeType,size,parents,appProperties)';
-  const url='https://www.googleapis.com/drive/v3/files?spaces=drive&pageSize=100&fields='+encodeURIComponent(fields)+'&q='+encodeURIComponent(query);
-  const r=await driveFetch(url);const data=await r.json();return data.files||[];
+  const all=[];let pageToken='';
+  do{
+    const params=new URLSearchParams({spaces:'drive',pageSize:'1000',fields:'nextPageToken,files(id,name,mimeType,size,parents,appProperties)',q:query});
+    if(pageToken)params.set('pageToken',pageToken);
+    const r=await driveFetch('https://www.googleapis.com/drive/v3/files?'+params.toString());const data=await r.json();all.push(...(data.files||[]));pageToken=data.nextPageToken||'';
+  }while(pageToken);
+  return all;
 }
 async function createDriveFolder(name,parentId,appProperties={}){
   const body={name,mimeType:'application/vnd.google-apps.folder',appProperties};if(parentId)body.parents=[parentId];
-  const r=await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id,name',{method:'POST',headers:{'Content-Type':'application/json; charset=UTF-8'},body:JSON.stringify(body)});return r.json();
+  const r=await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id,name,mimeType,parents,appProperties',{method:'POST',headers:{'Content-Type':'application/json; charset=UTF-8'},body:JSON.stringify(body)});return r.json();
 }
 async function ensureDriveFolders(){
   if(driveFolders&&getDriveToken())return driveFolders;
@@ -137,13 +149,8 @@ async function buildSongs(fileList){
   }
   return songs;
 }
-async function ensureSongFolder(s,parentId){
-  const found=await listDriveFiles(`trashed=false and '${q(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and appProperties has { key='kwSongId' and value='${q(s.songId)}' }`);
-  if(found[0])return found[0];
-  const name=(s.artist+' - '+s.title).replace(/[\r\n]+/g,' ').slice(0,180);return createDriveFolder(name,parentId,{kwSongId:s.songId,kwType:'song'});
-}
-async function findDriveAsset(folderId,role,songId){
-  const found=await listDriveFiles(`trashed=false and '${q(folderId)}' in parents and appProperties has { key='kwSongId' and value='${q(songId)}' } and appProperties has { key='kwRole' and value='${q(role)}' }`);return found[0]||null;
+async function createSongFolder(s,parentId){
+  const name=(s.artist+' - '+s.title).replace(/[\r\n]+/g,' ').slice(0,180);return createDriveFolder(name,parentId,{kwSongId:s.songId,kwType:'song',kwApp:'KaraokeWorld'});
 }
 function putResumable(location,file,onPct){
   return new Promise((resolve,reject)=>{
@@ -154,14 +161,13 @@ function putResumable(location,file,onPct){
     xhr.send(file);
   });
 }
-async function uploadDriveAsset(folderId,songId,role,file,onPct){
-  const existing=await findDriveAsset(folderId,role,songId);
-  if(existing&&role!=='txt'&&role!=='cover'&&existing.name===file.name&&Number(existing.size||0)===Number(file.size||0))return {id:existing.id,name:existing.name,size:existing.size,skipped:true};
+async function uploadDriveAsset(folderId,songId,role,file,onPct,existing=null){
+  if(existing&&role!=='txt'&&role!=='cover'&&existing.name===file.name&&Number(existing.size||0)===Number(file.size||0))return {id:existing.id,name:existing.name,size:existing.size,skipped:true,appProperties:existing.appProperties};
   const metadata={name:file.name,appProperties:{kwSongId:songId,kwRole:role,kwApp:'KaraokeWorld'}};if(!existing)metadata.parents=[folderId];
-  const base=existing?`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=resumable&fields=id,name,size`:'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size';
+  const base=existing?`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=resumable&fields=id,name,size,appProperties`:'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,appProperties';
   const start=await driveFetch(base,{method:existing?'PATCH':'POST',headers:{'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':file.type||'application/octet-stream','X-Upload-Content-Length':String(file.size||0)},body:JSON.stringify(metadata)});
   const location=start.headers.get('Location');if(!location)throw new Error('Google Drive n’a pas créé la session d’envoi.');
-  const result=await putResumable(location,file,onPct);return {id:result.id||existing?.id,name:result.name||file.name,size:result.size||file.size,skipped:false};
+  const result=await putResumable(location,file,onPct);return {id:result.id||existing?.id,name:result.name||file.name,size:result.size||file.size,skipped:false,appProperties:result.appProperties||metadata.appProperties};
 }
 async function uploadFolder(fileList){
   if(loading)return;loading=true;setBusy(true);
@@ -169,27 +175,50 @@ async function uploadFolder(fileList){
     await waitForCloud();const u=user();if(!u)throw new Error('Connecte-toi avec Google avant l’envoi.');if(!getDriveToken())throw new Error('Autorise Google Drive avant l’envoi.');
     const songs=await buildSongs(fileList);if(!songs.length)throw new Error('Aucune chanson UltraStar complète trouvée dans ce dossier.');
     const allAssets=songs.flatMap(s=>[s.tf,s.audio,s.video,s.cover].filter(Boolean)),totalBytes=allAssets.reduce((n,f)=>n+(f.size||0),0)||1;
-    let completedBytes=0,doneSongs=0;const badge=$id('cloudUltraStarBadge'),folders=await ensureDriveFolders();
-    progress(0,`Préparation de ${songs.length} chanson${songs.length>1?'s':''} · ${fmtBytes(totalBytes)} à envoyer sur Google Drive…`);
-    for(let i=0;i<songs.length;i++){
-      const s=songs[i],songFolder=await ensureSongFolder(s,folders.ultraStarId),ids={driveFolderId:songFolder.id};
+    const badge=$id('cloudUltraStarBadge'),folders=await ensureDriveFolders(),workersCount=Math.min(uploadConcurrency(),songs.length);
+    progress(0,`Préparation de ${songs.length} chanson${songs.length>1?'s':''} · ${fmtBytes(totalBytes)} · inventaire Drive…`);
+
+    const inventory=await listDriveFiles(`trashed=false and appProperties has { key='kwApp' and value='KaraokeWorld' }`);
+    const folderMap=new Map(),assetMap=new Map();
+    for(const f of inventory){
+      const ap=f.appProperties||{};
+      if(f.mimeType==='application/vnd.google-apps.folder'&&ap.kwType==='song'&&ap.kwSongId&&(!f.parents||f.parents.includes(folders.ultraStarId)))folderMap.set(ap.kwSongId,f);
+      if(ap.kwSongId&&ap.kwRole)assetMap.set(ap.kwSongId+'|'+ap.kwRole,f);
+    }
+
+    let settledBytes=0,doneSongs=0,nextIndex=0,fatalError=null;const inflight=new Map();
+    const bytesNow=()=>settledBytes+[...inflight.values()].reduce((a,b)=>a+b,0);
+    const paintUpload=(i,s,role,sent,fileTotal)=>{
+      const k=`${i}|${role}`;inflight.set(k,sent||0);const totalSent=bytesNow(),totalPct=totalSent/totalBytes*100,filePct=fileTotal?sent/fileTotal*100:0;
+      progress(totalPct,`☁ Drive · ${workersCount} envois simultanés · Chanson ${i+1}/${songs.length} · ${s.artist} — ${s.title} · ${roleName(role)} ${Math.round(filePct)} % · Total ${totalPct.toFixed(1)} % · ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)} · ✅ ${doneSongs}/${songs.length}`);
+    };
+    const processSong=async(i)=>{
+      const s=songs[i];let songFolder=folderMap.get(s.songId);
+      if(!songFolder){songFolder=await createSongFolder(s,folders.ultraStarId);folderMap.set(s.songId,songFolder)}
+      const ids={driveFolderId:songFolder.id};
       const assets=[['txt',s.tf],['audio',s.audio],['video',s.video],['cover',s.cover]].filter(x=>x[1]);
       for(const [role,file] of assets){
-        const uploaded=await uploadDriveAsset(songFolder.id,s.songId,role,file,(sent,fileTotal)=>{
-          const filePct=fileTotal?sent/fileTotal*100:100,totalSent=completedBytes+sent,totalPct=totalSent/totalBytes*100;
-          progress(totalPct,`☁ Drive · Chanson ${i+1}/${songs.length} · ${s.artist} — ${s.title} · ${roleName(role)} ${Math.round(filePct)} % · Total ${totalPct.toFixed(1)} % · ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)} · ✅ ${doneSongs}/${songs.length}`);
-        });
+        if(fatalError)throw fatalError;
+        const k=`${i}|${role}`,mapKey=s.songId+'|'+role,existing=assetMap.get(mapKey)||null;
+        const uploaded=await uploadDriveAsset(songFolder.id,s.songId,role,file,(sent,fileTotal)=>paintUpload(i,s,role,sent,fileTotal),existing);
+        inflight.delete(k);settledBytes+=file.size||0;assetMap.set(mapKey,{...existing,...uploaded,appProperties:{kwSongId:s.songId,kwRole:role,kwApp:'KaraokeWorld'}});
         ids[role+'FileId']=uploaded.id;ids[role+'Name']=file.name;
-        completedBytes+=file.size||0;
-        if(uploaded.skipped){const totalPct=completedBytes/totalBytes*100;progress(totalPct,`↪ ${roleName(role)} déjà présent sur Drive · ${s.artist} — ${s.title} · Total ${totalPct.toFixed(1)} % · ${fmtBytes(completedBytes)} / ${fmtBytes(totalBytes)}`)}
+        if(uploaded.skipped){const totalSent=bytesNow(),totalPct=totalSent/totalBytes*100;progress(totalPct,`↪ ${roleName(role)} déjà présent · ${s.artist} — ${s.title} · ${workersCount} envois simultanés · Total ${totalPct.toFixed(1)} % · ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)} · ✅ ${doneSongs}/${songs.length}`)}
       }
       const vg=parseFloat(String(s.parsed.meta?.VIDEOGAP||'0').replace(',','.'));
-      const manifest={schema:2,provider:'google-drive',title:s.title,artist:s.artist,genre:s.genre,bpm:s.parsed.bpm,gap:s.parsed.gap,videoGap:Number.isFinite(vg)?vg:0,originalDir:s.dir,...ids,updatedAt:Date.now(),createdAt:Date.now()};
+      const manifest={schema:3,provider:'google-drive',title:s.title,artist:s.artist,genre:s.genre,bpm:s.parsed.bpm,gap:s.parsed.gap,videoGap:Number.isFinite(vg)?vg:0,originalDir:s.dir,...ids,updatedAt:Date.now(),createdAt:Date.now()};
       await sdk.setDoc(sdk.doc(fs,'users',u.uid,'ultrastar',s.songId),manifest,{merge:true});
-      doneSongs=i+1;if(badge)badge.textContent=`${doneSongs}/${songs.length} sur Drive`;const totalPct=completedBytes/totalBytes*100;
-      progress(totalPct,`✅ ${doneSongs}/${songs.length} terminée${doneSongs>1?'s':''} · ${s.artist} — ${s.title} · Total ${totalPct.toFixed(1)} % · ${fmtBytes(completedBytes)} / ${fmtBytes(totalBytes)}`);
-    }
-    progress(100,`✅ ${songs.length} chanson${songs.length>1?'s':''} disponible${songs.length>1?'s':''} sur Google Drive · ${fmtBytes(totalBytes)} traités.`);await loadCatalog(true);
+      doneSongs++;if(badge)badge.textContent=`${doneSongs}/${songs.length} sur Drive`;const totalSent=bytesNow(),totalPct=totalSent/totalBytes*100;
+      progress(totalPct,`✅ ${doneSongs}/${songs.length} terminée${doneSongs>1?'s':''} · ${s.artist} — ${s.title} · ${workersCount} envois simultanés · Total ${totalPct.toFixed(1)} % · ${fmtBytes(totalSent)} / ${fmtBytes(totalBytes)}`);
+    };
+    const worker=async()=>{
+      while(!fatalError){const i=nextIndex++;if(i>=songs.length)return;try{await processSong(i)}catch(e){fatalError=e;throw e}}
+    };
+    progress(0,`🚀 Envoi parallèle lancé · ${workersCount} chanson${workersCount>1?'s':''} à la fois · ${songs.length} au total · ${fmtBytes(totalBytes)}.`);
+    const results=await Promise.allSettled(Array.from({length:workersCount},()=>worker()));
+    if(fatalError)throw fatalError;
+    const rejected=results.find(r=>r.status==='rejected');if(rejected)throw rejected.reason;
+    progress(100,`✅ ${songs.length} chanson${songs.length>1?'s':''} disponible${songs.length>1?'s':''} sur Google Drive · ${fmtBytes(totalBytes)} traités · envoi parallèle terminé.`);await loadCatalog(true);
   }catch(e){console.error(e);status('Google Drive : '+explainDriveError(e),'error')}
   finally{loading=false;setBusy(false);const input=$id('cloudUltraStarInput');if(input)input.value=''}
 }
@@ -238,5 +267,5 @@ async function init(){
   try{await waitForCloud();const badge=$id('cloudUltraStarBadge');if(badge)badge.textContent=user()?'Connecté':'Hors ligne';if(user())loadCatalog(false)}catch(e){status('Bibliothèque Google Drive prête dès que Firebase est disponible.')}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-window.KaraokeWorldCloudUltraStar={version:VERSION,provider:'google-drive',reload:()=>loadCatalog(true),authorizeDrive};
+window.KaraokeWorldCloudUltraStar={version:VERSION,provider:'google-drive',reload:()=>loadCatalog(true),authorizeDrive,getUploadConcurrency:uploadConcurrency,setUploadConcurrency};
 })();
