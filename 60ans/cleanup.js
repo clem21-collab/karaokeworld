@@ -1,6 +1,13 @@
 (()=>{
   const frame=document.getElementById('kwApp');
-  const cleanupUrl=new URL('./cleanup.css?v=2',location.href).href;
+  const cleanupUrl=new URL('./cleanup.css?v=3',location.href).href;
+
+  const stageBackground=`
+    radial-gradient(circle at 50% 14%,rgba(163,72,184,.24) 0%,transparent 24%),
+    radial-gradient(circle at 52% 58%,rgba(214,132,33,.22) 0%,transparent 30%),
+    radial-gradient(circle at 50% 82%,rgba(98,45,20,.18) 0%,transparent 28%),
+    linear-gradient(135deg,#090808 0%,#1a0f08 42%,#120c08 68%,#060606 100%)
+  `;
 
   const forceCss=`
 html body.birthday60::before,
@@ -10,31 +17,71 @@ html body.birthday60 header .brand::before,
 html body.birthday60 footer::after{content:none!important;display:none!important;animation:none!important;filter:none!important}
 
 html body.birthday60 .karaoke-stage{
-  background:radial-gradient(circle at 42% 45%,rgba(191,128,29,.12),transparent 34%),linear-gradient(135deg,#080806 0%,#0d0b08 52%,#050606 100%)!important;
+  position:fixed!important;
+  overflow:hidden!important;
+  background:${stageBackground}!important;
+}
+html body.birthday60 .karaoke-stage::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:-2!important;
+  pointer-events:none!important;
+  background:
+    linear-gradient(90deg,rgba(10,8,6,.18),rgba(10,8,6,.06) 20%,rgba(10,8,6,.06) 80%,rgba(10,8,6,.18)),
+    repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 2px,transparent 2px 44px)!important;
+  opacity:.55!important;
 }
 html body.birthday60 .karaoke-stage::after{
-  content:""!important;display:block!important;position:absolute!important;inset:0!important;z-index:-1!important;
-  background:linear-gradient(90deg,rgba(7,7,6,.58),rgba(10,8,5,.76))!important;pointer-events:none!important;
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:-1!important;
+  pointer-events:none!important;
+  background:
+    radial-gradient(circle at 50% 52%,rgba(255,184,61,.08) 0%,transparent 34%),
+    radial-gradient(circle at 50% 18%,rgba(184,88,214,.10) 0%,transparent 22%)!important;
 }
 html body.birthday60 .stage-lyrics-wrap{
-  background:radial-gradient(ellipse at 50% 45%,rgba(196,132,30,.15) 0%,rgba(40,27,11,.14) 34%,#0a0907 72%,#050606 100%)!important;
+  background:transparent!important;
 }
 html body.birthday60 .stage-lyrics-wrap::before,
 html body.birthday60 .stage-bg::after{content:none!important;display:none!important;animation:none!important;filter:none!important}
-html body.birthday60 .stage-video{background:linear-gradient(180deg,#090b0a,#0e0d09)!important;border-left:1px solid #725622!important}
-html body.birthday60 .stage-line{color:#9d9587!important;text-shadow:none!important}
+html body.birthday60 .stage-video{
+  background:linear-gradient(180deg,#071012 0%,#081315 100%)!important;
+  border-left:1px solid #8a6a2b!important;
+  box-shadow:inset 1px 0 0 rgba(255,255,255,.04)!important;
+}
+html body.birthday60 .stage-video .youtube-frame{
+  border:1px solid #4a3a1e!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.42)!important;
+}
+html body.birthday60 .stage-line{color:#9e9587!important;text-shadow:none!important}
 html body.birthday60 .stage-line.near,
 html body.birthday60 .stage-line.next{color:#d8c9a7!important}
 html body.birthday60 .stage-line.active{
   background:linear-gradient(90deg,#f0b93f var(--sing-progress,0%),#fff1c8 var(--sing-progress,0%))!important;
-  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;text-shadow:none!important;
-  filter:drop-shadow(0 0 12px rgba(224,169,55,.48))!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+  text-shadow:none!important;
+  filter:drop-shadow(0 0 12px rgba(224,169,55,.45))!important;
 }
 html body.birthday60 .stage-line.instrumental{color:#cba75d!important}
 html body.birthday60 .stage-song-info span,
 html body.birthday60 .stage-hint,
 html body.birthday60 .stage-mic{color:#bcae90!important}
-html body.birthday60 .stage-countdown{color:#f0bd48!important;text-shadow:0 0 45px rgba(240,189,72,.55)!important;background:rgba(8,7,5,.52)!important}
+html body.birthday60 .stage-countdown{
+  color:#f0bd48!important;
+  text-shadow:0 0 45px rgba(240,189,72,.55)!important;
+  background:rgba(8,7,5,.52)!important;
+}
+html body.birthday60 .stage-controls button,
+html body.birthday60 .stage-video button{box-shadow:none!important}
+html body.birthday60 .stage-video input[type="range"],
+html body.birthday60 .karaoke-stage input[type="range"]{accent-color:#e9b749!important}
 `;
 
   function injectCleanup(d){
@@ -55,27 +102,29 @@ html body.birthday60 .stage-countdown{color:#f0bd48!important;text-shadow:0 0 45
     if(!style){
       style=d.createElement('style');
       style.id='kw60StageForceCss';
-      style.textContent=forceCss;
-      d.head.appendChild(style);
-    }else{
-      style.textContent=forceCss;
       d.head.appendChild(style);
     }
+    style.textContent=forceCss;
+    d.head.appendChild(style);
   }
 
   function forceStage(d){
     injectCleanup(d);
     const stage=d.querySelector('.karaoke-stage');
     if(!stage)return;
-    stage.style.setProperty('background','radial-gradient(circle at 42% 45%,rgba(191,128,29,.12),transparent 34%),linear-gradient(135deg,#080806 0%,#0d0b08 52%,#050606 100%)','important');
+
+    stage.style.setProperty('background',stageBackground.replace(/\s+/g,' '),'important');
+    stage.style.setProperty('position','fixed','important');
+    stage.style.setProperty('overflow','hidden','important');
 
     const wrap=d.querySelector('.stage-lyrics-wrap');
-    if(wrap)wrap.style.setProperty('background','radial-gradient(ellipse at 50% 45%,rgba(196,132,30,.15) 0%,rgba(40,27,11,.14) 34%,#0a0907 72%,#050606 100%)','important');
+    if(wrap)wrap.style.setProperty('background','transparent','important');
 
     const video=d.querySelector('.stage-video');
     if(video){
-      video.style.setProperty('background','linear-gradient(180deg,#090b0a,#0e0d09)','important');
-      video.style.setProperty('border-left','1px solid #725622','important');
+      video.style.setProperty('background','linear-gradient(180deg,#071012 0%,#081315 100%)','important');
+      video.style.setProperty('border-left','1px solid #8a6a2b','important');
+      video.style.setProperty('box-shadow','inset 1px 0 0 rgba(255,255,255,.04)','important');
     }
   }
 
