@@ -27,7 +27,7 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.28.4 — chargeur des correctifs complémentaires.
+// v0.28.5 — chargeur des correctifs complémentaires.
 // Le moteur vidéo principal reste chargé par recently-sung.js pour éviter deux files concurrentes.
 (()=>{
   const addons=[
@@ -41,6 +41,7 @@
     {src:'./drive-oauth-default-v0281.js?v=0284',key:'drive-oauth-default'},
     {src:'./drive-oauth-refresh-v0281.js?v=0284',key:'drive-oauth-refresh'},
     {src:'./nav-ultrastar-scope-v0284.js?v=0284',key:'nav-ultrastar-scope'},
+    {src:'./ultrastar-folder-sync-v0285.js?v=0285',key:'ultrastar-folder-sync'},
     {src:'./version-display-v0280.js?v=0284',key:'version-display'}
   ];
   function load(i=0){
