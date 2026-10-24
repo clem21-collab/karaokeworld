@@ -2,6 +2,7 @@
 (()=>{
  const CACHE_KEY='kw_cover_cache_v2';
  const LEGACY_KEY='kw_cover_cache_v1';
+ const COVER_BACKEND='https://karaokeworld-drive-oauth.onrender.com';
  const NEGATIVE_TTL=6*60*60*1000;
  const POSITIVE_TTL=30*24*60*60*1000;
  const MAX_CONCURRENT=4;
@@ -28,6 +29,13 @@
    let best=null,bestScore=0;for(const x of list){const s=scoreResult(x,title,artist);if(s>bestScore){best=x;bestScore=s}}
    if(!best||bestScore<.53)return'';let url=best.artworkUrl100||'';if(url)url=url.replace(/100x100bb/g,'600x600bb');return url
  }
+ async function backendSearch(title,artist){
+   const u=new URL(COVER_BACKEND+'/covers/search');u.searchParams.set('title',title);if(artist)u.searchParams.set('artist',artist);
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+   try{const r=await queued(()=>fetch(u,{cache:'no-store',signal:controller.signal}));if(!r.ok)return{ok:false,url:''};const j=await r.json();return{ok:true,url:j?.url||''}}
+   catch(e){console.warn('KaraokeWorld pochette MusicBrainz',e);return{ok:false,url:''}}
+   finally{clearTimeout(timer)}
+ }
  const pending=new Map();
  async function lookup(title,artist){
    const k=key(title,artist),cv=cachedValue(k);if(cv?.hit)return cv.url;if(pending.has(k))return pending.get(k);if(!title)return'';
@@ -39,6 +47,7 @@
        for(const q of queries.slice(0,3)){url=await itunesSearch(q,ct,ca,'FR');if(url)break}
        if(!url&&queries[0])url=await itunesSearch(queries[0],ct,ca,'US');
      }catch(e){console.warn('KaraokeWorld pochette iTunes',e)}
+     if(!url){const fb=await backendSearch(ct,ca);if(fb.url)url=fb.url;else if(!fb.ok)return''}
      putCache(k,url);return url
    })().finally(()=>pending.delete(k));pending.set(k,p);return p
  }
