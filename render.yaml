@@ -12,6 +12,8 @@ services:
         value: https://clem21-collab.github.io
       - key: KW_FIREBASE_PROJECT_ID
         value: karaokeworld-d503f
+      - key: KW_GOOGLE_REDIRECT_URI
+        value: https://karaokeworld-drive-oauth.onrender.com/google/oauth/callback
       - key: KW_TOKEN_ENCRYPTION_KEY
         generateValue: true
       - key: KW_STATE_SECRET
