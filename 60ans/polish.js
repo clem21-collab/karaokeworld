@@ -1,6 +1,6 @@
 (()=>{
   const frame=document.getElementById('kwApp');
-  const cssUrl=new URL('./polish.css?v=2',location.href).href;
+  const cssUrl=new URL('./polish.css?v=3',location.href).href;
 
   function inject(){
     try{
