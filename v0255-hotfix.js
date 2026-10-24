@@ -27,20 +27,20 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.28.1 — chargeur des correctifs complémentaires.
+// v0.28.2 — chargeur des correctifs complémentaires.
 // Le moteur vidéo principal reste chargé par recently-sung.js pour éviter deux files concurrentes.
 (()=>{
   const addons=[
-    {src:'./hotfix-v0267.js?v=0281b',key:'hotfix'},
-    {src:'./video-once-v0272.js?v=0281b',key:'video-once'},
-    {src:'./library-dedupe-v0275.js?v=0281b',key:'dedupe'},
-    {src:'./vocal-separation-v0276.js?v=0281b',key:'vocals'},
-    {src:'./vocal-button-fix-v0277.js?v=0281b',key:'voice-button-fix'},
-    {src:'./vocal-loudness-v0278.js?v=0281b',key:'voice-loudness'},
-    {src:'./drive-token-expiry-v0280.js?v=0281b',key:'drive-token-expiry'},
-    {src:'./drive-oauth-default-v0281.js?v=0281b',key:'drive-oauth-default'},
-    {src:'./drive-oauth-refresh-v0281.js?v=0281b',key:'drive-oauth-refresh'},
-    {src:'./version-display-v0280.js?v=0281b',key:'version-display'}
+    {src:'./hotfix-v0267.js?v=0282',key:'hotfix'},
+    {src:'./video-once-v0272.js?v=0282',key:'video-once'},
+    {src:'./library-dedupe-v0275.js?v=0282',key:'dedupe'},
+    {src:'./vocal-separation-v0276.js?v=0282',key:'vocals'},
+    {src:'./vocal-button-fix-v0277.js?v=0282',key:'voice-button-fix'},
+    {src:'./vocal-loudness-v0278.js?v=0282',key:'voice-loudness'},
+    {src:'./drive-token-expiry-v0280.js?v=0282',key:'drive-token-expiry'},
+    {src:'./drive-oauth-default-v0281.js?v=0282',key:'drive-oauth-default'},
+    {src:'./drive-oauth-refresh-v0281.js?v=0282',key:'drive-oauth-refresh'},
+    {src:'./version-display-v0280.js?v=0282',key:'version-display'}
   ];
   function load(i=0){
     if(i>=addons.length)return;
