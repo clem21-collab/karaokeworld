@@ -1,0 +1,111 @@
+/* 60 ans — neutralise uniquement les anciennes couches Halloween du moteur original */
+body.birthday60::before,
+body.birthday60::after,
+body.birthday60 main::after,
+body.birthday60 header .brand::before,
+body.birthday60 footer::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  animation:none!important;
+  filter:none!important;
+}
+
+/* Le héros 60 ans garde ses propres ::before / ::after définis dans theme.css. */
+body.birthday60 .hero:not(.home-hero)::before,
+body.birthday60 .hero:not(.home-hero)::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Plein écran karaoké — retire toile, chauves-souris, citrouilles, fantômes et violet Halloween. */
+body.birthday60 .karaoke-stage{
+  background:radial-gradient(circle at 42% 45%,rgba(191,128,29,.13),transparent 33%),linear-gradient(135deg,#080806 0%,#0d0b08 52%,#050606 100%)!important;
+}
+body.birthday60 .karaoke-stage::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:-1!important;
+  background:linear-gradient(90deg,rgba(7,7,6,.58),rgba(10,8,5,.76))!important;
+  pointer-events:none!important;
+}
+body.birthday60 .stage-lyrics-wrap{
+  background:radial-gradient(ellipse at 50% 45%,rgba(196,132,30,.17) 0%,rgba(40,27,11,.16) 33%,#0a0907 72%,#050606 100%)!important;
+}
+body.birthday60 .stage-lyrics-wrap::before,
+body.birthday60 .stage-bg::after{
+  content:none!important;
+  display:none!important;
+  animation:none!important;
+  filter:none!important;
+}
+body.birthday60 .stage-video{
+  background:linear-gradient(180deg,#090b0a,#0e0d09)!important;
+  border-left:1px solid #725622!important;
+}
+body.birthday60 .stage-video .youtube-frame{
+  border:1px solid #4a3a1e!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.42)!important;
+}
+body.birthday60 .stage-line{
+  color:#9d9587!important;
+}
+body.birthday60 .stage-line.near,
+body.birthday60 .stage-line.next{
+  color:#d8c9a7!important;
+}
+body.birthday60 .stage-line.active{
+  background:linear-gradient(90deg,#f0b93f var(--sing-progress,0%),#fff1c8 var(--sing-progress,0%))!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+  text-shadow:none!important;
+  filter:drop-shadow(0 0 12px rgba(224,169,55,.48))!important;
+}
+body.birthday60 .stage-line.instrumental{
+  color:#cba75d!important;
+}
+body.birthday60 .stage-song-info span,
+body.birthday60 .stage-hint,
+body.birthday60 .stage-mic{
+  color:#bcae90!important;
+}
+body.birthday60 .stage-mic-meter{
+  background:#262218!important;
+}
+body.birthday60 .stage-mic.on>span:first-child{
+  background:#f0bd48!important;
+  box-shadow:0 0 10px rgba(240,189,72,.6)!important;
+}
+body.birthday60 .stage-countdown{
+  color:#f0bd48!important;
+  text-shadow:0 0 45px rgba(240,189,72,.55)!important;
+  background:rgba(8,7,5,.52)!important;
+}
+body.birthday60 .stage-controls button,
+body.birthday60 .stage-video button{
+  box-shadow:none!important;
+}
+body.birthday60 .stage-video input[type="range"],
+body.birthday60 .karaoke-stage input[type="range"]{
+  accent-color:#e9b749!important;
+}
+
+/* Couleurs de fond des panneaux qui pouvaient encore hériter du violet Halloween. */
+body.birthday60 .lyrics,
+body.birthday60 .library-tools,
+body.birthday60 .playlist-tools,
+body.birthday60 .lyric-result,
+body.birthday60 .youtube-result{
+  background:#101311!important;
+  border-color:#494332!important;
+}
+body.birthday60 .highlight{
+  color:#f2c45e!important;
+  text-shadow:0 0 15px rgba(232,177,58,.38)!important;
+}
+body.birthday60 .meter span{
+  background:linear-gradient(90deg,#8d651f,#f0bd48)!important;
+}
