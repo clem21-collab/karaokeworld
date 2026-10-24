@@ -46,10 +46,11 @@ html body.birthday60 .stage-lyrics-wrap::before{
   background:linear-gradient(105deg,transparent 10%,rgba(255,220,145,.035) 28%,transparent 43%),linear-gradient(255deg,transparent 15%,rgba(255,220,145,.025) 35%,transparent 48%),radial-gradient(ellipse at 50% 52%,rgba(255,207,100,.07),transparent 56%)!important;
 }
 html body.birthday60 .stage-lyrics-wrap::after{
-  content:""!important;display:block!important;position:absolute!important;left:8%!important;right:8%!important;top:18%!important;bottom:16%!important;z-index:0!important;pointer-events:none!important;
-  border:1px solid rgba(231,186,87,.09)!important;border-radius:34px!important;
-  background:linear-gradient(180deg,rgba(12,10,8,.22),rgba(12,10,8,.07))!important;
-  box-shadow:0 26px 70px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.018)!important;
+  content:none!important;
+  display:none!important;
+  border:0!important;
+  background:none!important;
+  box-shadow:none!important;
 }
 html body.birthday60 .stage-lyrics-wrap>*{position:relative!important;z-index:2!important}
 html body.birthday60 .stage-bg::after{content:none!important;display:none!important;animation:none!important;filter:none!important}
