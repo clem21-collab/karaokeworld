@@ -49,9 +49,7 @@ body.birthday60 .kw60-top-search:focus-within{
   box-shadow:0 0 0 3px rgba(222,164,46,.08)!important;
 }
 body.birthday60 .kw60-sun,
-body.birthday60 .kw60-normal{
-  min-height:40px!important;
-}
+body.birthday60 .kw60-normal{min-height:40px!important}
 
 /* Menu gauche plus premium */
 body.birthday60 aside{
@@ -147,9 +145,7 @@ body.birthday60 #page-home{padding:20px 20px 2px!important}
 body.birthday60 .home-section{margin-bottom:22px!important}
 body.birthday60 .home-section .row-head h2,
 body.birthday60 .library-section h2,
-body.birthday60 .panel h2{
-  letter-spacing:-.015em!important;
-}
+body.birthday60 .panel h2{letter-spacing:-.015em!important}
 body.birthday60 .home-card,
 body.birthday60 .track,
 body.birthday60 .panel,
@@ -217,9 +213,7 @@ body.birthday60 textarea:focus{
   outline:none!important;
   box-shadow:0 0 0 3px rgba(232,182,76,.07)!important;
 }
-body.birthday60 .filter{
-  transition:transform .15s ease,border-color .15s ease!important;
-}
+body.birthday60 .filter{transition:transform .15s ease,border-color .15s ease!important}
 body.birthday60 .filter:hover{transform:translateY(-1px)!important;border-color:rgba(232,182,76,.40)!important}
 
 /* Scrollbar discrète */
@@ -241,4 +235,137 @@ body.birthday60 *::-webkit-scrollbar-thumb{background:#725524;border-radius:10px
 @media(max-width:1050px){
   body.birthday60 .kw60-topnav button:nth-child(4){display:none!important}
   body.birthday60 .kw60-hero-copy{width:82%!important}
+}
+
+/* ===== Finitions édition 60 ans v2 ===== */
+body.birthday60 .kw60-brand-badge{
+  flex:0 0 auto;
+  margin-left:-2px;
+  padding:5px 8px 4px;
+  border:1px solid rgba(236,190,90,.34);
+  border-radius:999px;
+  background:linear-gradient(180deg,rgba(129,91,29,.30),rgba(70,49,20,.20));
+  color:#f2ca70;
+  font:800 9px/1.1 Inter,Segoe UI,Arial,sans-serif;
+  letter-spacing:.12em;
+  white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+body.birthday60 .kw60-hero-seal{
+  position:absolute;
+  z-index:7;
+  right:42px;
+  top:52px;
+  width:116px;
+  height:116px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  color:#271707;
+  background:radial-gradient(circle at 34% 28%,#fff2b8 0 6%,#f0c864 26%,#d89b2f 64%,#8f5d19 100%);
+  border:2px solid rgba(255,229,159,.74);
+  box-shadow:0 16px 36px rgba(0,0,0,.34),inset 0 0 0 5px rgba(86,50,9,.16),inset 0 1px 0 rgba(255,255,255,.55);
+  transform:rotate(5deg);
+}
+body.birthday60 .kw60-hero-seal strong{
+  display:block;
+  font:800 43px/.82 Georgia,'Times New Roman',serif;
+  letter-spacing:-.06em;
+}
+body.birthday60 .kw60-hero-seal span{
+  display:block;
+  margin-top:5px;
+  font:900 10px/1.05 Inter,Segoe UI,Arial,sans-serif;
+  letter-spacing:.15em;
+}
+body.birthday60 .kw60-hero-seal small{
+  display:block;
+  margin-top:3px;
+  font:800 8px/1 Inter,Segoe UI,Arial,sans-serif;
+  letter-spacing:.08em;
+  opacity:.78;
+}
+body.birthday60 .kw60-hero-copy{
+  border-radius:26px!important;
+  box-shadow:0 22px 55px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+body.birthday60 .kw60-hero-copy:before{
+  content:'';
+  display:block;
+  width:72px;
+  height:2px;
+  margin:0 auto 16px;
+  border-radius:99px;
+  background:linear-gradient(90deg,transparent,#f2c763,transparent);
+  box-shadow:0 0 18px rgba(231,176,57,.34);
+}
+body.birthday60 .home-section .row-head{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+body.birthday60 .home-section .row-head:after{
+  content:'';
+  height:1px;
+  flex:1;
+  min-width:28px;
+  background:linear-gradient(90deg,rgba(232,182,76,.30),rgba(232,182,76,0));
+}
+body.birthday60 .home-section .row-head h2,
+body.birthday60 .library-section h2,
+body.birthday60 .panel h2{
+  color:#f7f0df!important;
+  text-shadow:0 2px 12px rgba(0,0,0,.25)!important;
+}
+body.birthday60 .home-card,
+body.birthday60 .track{
+  position:relative!important;
+  overflow:hidden!important;
+}
+body.birthday60 .home-card:before,
+body.birthday60 .track:before{
+  content:'';
+  position:absolute;
+  left:0;right:0;top:0;
+  height:2px;
+  opacity:.55;
+  background:linear-gradient(90deg,transparent,#dca73e 48%,transparent);
+  pointer-events:none;
+}
+body.birthday60 .home-card:hover:before,
+body.birthday60 .track:hover:before{opacity:1}
+body.birthday60 .track h3,
+body.birthday60 .home-card b{font-weight:760!important;letter-spacing:-.01em!important}
+body.birthday60 .track p,
+body.birthday60 .home-card span{line-height:1.35!important}
+body.birthday60 .filter.active,
+body.birthday60 .kw60-chip.active{
+  box-shadow:0 7px 18px rgba(137,91,19,.18),inset 0 1px 0 rgba(255,255,255,.28)!important;
+}
+body.birthday60 .kw60-inline-banner{
+  margin:18px!important;
+  padding:16px 18px!important;
+  border:1px solid rgba(232,182,76,.24)!important;
+  border-radius:14px!important;
+  background:radial-gradient(circle at 8% 30%,rgba(207,144,39,.14),transparent 22%),linear-gradient(135deg,#111512,#0b0e0d)!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.18)!important;
+}
+body.birthday60 .kw60-inline-banner b{color:#f3d17e!important;font-size:17px!important}
+body.birthday60 .kw60-inline-banner small{color:#aaa99f!important}
+body.birthday60 .karaoke-stage .stage-controls,
+body.birthday60 .karaoke-stage .stage-video{
+  backdrop-filter:blur(2px)!important;
+}
+body.birthday60 .stage-controls button{
+  border-color:rgba(232,182,76,.35)!important;
+}
+@media(max-width:1320px){
+  body.birthday60 .kw60-brand-badge{display:none}
+  body.birthday60 .kw60-hero-seal{right:24px;top:58px;width:96px;height:96px}
+  body.birthday60 .kw60-hero-seal strong{font-size:36px}
+}
+@media(max-width:1050px){
+  body.birthday60 .kw60-hero-seal{display:none}
 }
