@@ -109,3 +109,71 @@ body.birthday60 .highlight{
 body.birthday60 .meter span{
   background:linear-gradient(90deg,#8d651f,#f0bd48)!important;
 }
+
+/* Header 60 ans — évite que la recherche passe devant Catalogue / Playlists / Favoris. */
+body.birthday60 header{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:nowrap!important;
+  gap:8px!important;
+  overflow:hidden!important;
+}
+body.birthday60 header .brand{
+  flex:0 0 auto!important;
+  position:relative!important;
+  z-index:4!important;
+}
+body.birthday60 .kw60-topnav{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:2px!important;
+  position:relative!important;
+  z-index:4!important;
+}
+body.birthday60 .kw60-topnav button{
+  flex:0 0 auto!important;
+  position:relative!important;
+  z-index:4!important;
+  padding-left:9px!important;
+  padding-right:9px!important;
+}
+body.birthday60 .kw60-top-search{
+  flex:0 1 340px!important;
+  width:min(340px,24vw)!important;
+  min-width:190px!important;
+  max-width:340px!important;
+  position:relative!important;
+  z-index:3!important;
+  margin-left:auto!important;
+}
+body.birthday60 .top-actions{
+  flex:0 0 auto!important;
+  min-width:max-content!important;
+  position:relative!important;
+  z-index:5!important;
+  margin-left:0!important;
+}
+body.birthday60 .top-actions button{
+  flex:0 0 auto!important;
+  white-space:nowrap!important;
+}
+
+/* Sur les largeurs d'ordinateur courantes, on garde en priorité les boutons utiles. */
+@media(max-width:1780px){
+  body.birthday60 .kw60-topnav button:nth-child(5),
+  body.birthday60 .kw60-topnav button:nth-child(6),
+  body.birthday60 .kw60-topnav button:nth-child(7){display:none!important}
+  body.birthday60 .kw60-top-search{flex-basis:300px!important;width:min(300px,22vw)!important;max-width:300px!important}
+}
+@media(max-width:1480px){
+  body.birthday60 .kw60-topnav button:nth-child(4){display:none!important}
+  body.birthday60 .kw60-top-search{flex-basis:250px!important;width:min(250px,20vw)!important;max-width:250px!important;min-width:160px!important}
+  body.birthday60 .top-actions button{padding-left:10px!important;padding-right:10px!important}
+}
+@media(max-width:1220px){
+  body.birthday60 .kw60-topnav button:nth-child(3){display:none!important}
+  body.birthday60 .kw60-top-search{display:none!important}
+}
