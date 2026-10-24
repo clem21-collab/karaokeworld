@@ -1,6 +1,6 @@
 (()=>{
   const frame=document.getElementById('kwApp');
-  const cleanupUrl=new URL('./cleanup.css?v=3',location.href).href;
+  const cleanupUrl=new URL('./cleanup.css?v=4',location.href).href;
 
   const stageBackground=`
     radial-gradient(circle at 50% 14%,rgba(163,72,184,.24) 0%,transparent 24%),
