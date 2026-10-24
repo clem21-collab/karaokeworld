@@ -1,9 +1,9 @@
-/* KaraokeWorld v0.28.2 — pochettes plus fiables + suppression bibliothèque */
+/* KaraokeWorld v0.28.3 — pochettes multi-sources + jaquette générée de secours */
 (()=>{
- const CACHE_KEY='kw_cover_cache_v2';
- const LEGACY_KEY='kw_cover_cache_v1';
+ const CACHE_KEY='kw_cover_cache_v3';
+ const OLD_CACHE_KEYS=['kw_cover_cache_v2','kw_cover_cache_v1'];
  const COVER_BACKEND='https://karaokeworld-drive-oauth.onrender.com';
- const NEGATIVE_TTL=6*60*60*1000;
+ const NEGATIVE_TTL=30*60*1000;
  const POSITIVE_TTL=30*24*60*60*1000;
  const MAX_CONCURRENT=4;
  const esc=s=>String(s??'').trim();
@@ -12,7 +12,16 @@
  const cleanArtist=s=>esc(s).replace(/\s+(feat\.?|ft\.?|featuring|with|x)\s+.+$/i,' ').replace(/\s+/g,' ').trim();
  function load(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}')}catch{return{}}}
  const cache=load();
- try{const old=JSON.parse(localStorage.getItem(LEGACY_KEY)||'{}');for(const [k,v] of Object.entries(old||{}))if(v&&cache[k]===undefined)cache[k]={url:v,ts:Date.now()}}catch{}
+ try{
+   for(const oldKey of OLD_CACHE_KEYS){
+     const old=JSON.parse(localStorage.getItem(oldKey)||'{}');
+     for(const [k,v] of Object.entries(old||{})){
+       if(cache[k]!==undefined)continue;
+       if(typeof v==='string'&&v)cache[k]={url:v,ts:Date.now()};
+       else if(v&&typeof v==='object'&&v.url)cache[k]={url:v.url,ts:Number(v.ts)||Date.now()};
+     }
+   }
+ }catch{}
  let saveTimer;
  const save=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(CACHE_KEY,JSON.stringify(cache))}catch{}},250)};
  function key(title,artist){return `${norm(title)}|${norm(artist)}`}
@@ -31,9 +40,9 @@
  }
  async function backendSearch(title,artist){
    const u=new URL(COVER_BACKEND+'/covers/search');u.searchParams.set('title',title);if(artist)u.searchParams.set('artist',artist);
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
-   try{const r=await queued(()=>fetch(u,{cache:'no-store',signal:controller.signal}));if(!r.ok)return{ok:false,url:''};const j=await r.json();return{ok:true,url:j?.url||''}}
-   catch(e){console.warn('KaraokeWorld pochette MusicBrainz',e);return{ok:false,url:''}}
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+   try{const r=await queued(()=>fetch(u,{cache:'no-store',signal:controller.signal}));if(!r.ok)return{ok:false,url:''};const j=await r.json();return{ok:true,url:j?.url||'',source:j?.source||''}}
+   catch(e){console.warn('KaraokeWorld pochette serveur',e);return{ok:false,url:''}}
    finally{clearTimeout(timer)}
  }
  const pending=new Map();
@@ -52,10 +61,27 @@
    })().finally(()=>pending.delete(k));pending.set(k,p);return p
  }
  function text(root){const title=esc(root.querySelector('h3,b')?.textContent);let artist=esc(root.querySelector('p,span')?.textContent);artist=artist.split(' · ')[0].replace(/^⭐\s*/,'').trim();return{title,artist}}
- function apply(root,url){if(!root||!url||root.dataset.kwCover===url)return;let slot=root.querySelector('.cover,.home-emoji,.mini');if(!slot)return;slot.dataset.fallback=slot.dataset.fallback||slot.textContent;slot.textContent='';slot.style.backgroundImage=`linear-gradient(180deg,transparent 55%,rgba(0,0,0,.45)),url("${url.replace(/"/g,'%22')}")`;slot.style.backgroundSize='cover';slot.style.backgroundPosition='center';slot.style.color='transparent';slot.setAttribute('aria-label','Pochette de la chanson');root.dataset.kwCover=url}
+ function xml(s){return esc(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]))}
+ function hash(s){let h=2166136261;for(const ch of String(s)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+ function splitTitle(s){
+   const words=esc(s).split(/\s+/),lines=['',''];
+   for(const word of words){const i=!lines[0]||lines[0].length<20?0:1;if((lines[i]+' '+word).trim().length<=26||!lines[i])lines[i]=(lines[i]+' '+word).trim();else if(i===0)lines[1]=word;else{lines[1]=(lines[1]+'…').slice(0,27);break}}
+   return lines.filter(Boolean)
+ }
+ function generatedCover(title,artist){
+   const seed=hash(`${title}|${artist}`),h1=seed%360,h2=(h1+38+(seed%52))%360,lines=splitTitle(title);const a=esc(artist||'KaraokeWorld').slice(0,34);
+   const titleSvg=lines.map((line,i)=>`<text x="50%" y="${315+i*64}" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="48" font-weight="700">${xml(line)}</text>`).join('');
+   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${h1} 52% 24%)"/><stop offset="1" stop-color="hsl(${h2} 65% 10%)"/></linearGradient><radialGradient id="r"><stop stop-color="rgba(255,255,255,.19)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/></radialGradient></defs><rect width="600" height="600" rx="28" fill="url(#g)"/><circle cx="480" cy="110" r="220" fill="url(#r)"/><text x="50%" y="175" text-anchor="middle" font-family="Arial,sans-serif" font-size="92">🎤</text>${titleSvg}<text x="50%" y="475" text-anchor="middle" fill="rgba(255,255,255,.78)" font-family="Arial,sans-serif" font-size="29">${xml(a)}</text><text x="50%" y="545" text-anchor="middle" fill="rgba(255,255,255,.42)" font-family="Arial,sans-serif" font-size="19" letter-spacing="3">KARAOKEWORLD</text></svg>`;
+   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)
+ }
+ function apply(root,url,generated=false){if(!root||!url||root.dataset.kwCover===url)return;let slot=root.querySelector('.cover,.home-emoji,.mini');if(!slot)return;slot.dataset.fallback=slot.dataset.fallback||slot.textContent;slot.textContent='';slot.style.backgroundImage=`linear-gradient(180deg,transparent 55%,rgba(0,0,0,.45)),url("${url.replace(/"/g,'%22')}")`;slot.style.backgroundSize='cover';slot.style.backgroundPosition='center';slot.style.color='transparent';slot.setAttribute('aria-label',generated?'Jaquette KaraokeWorld générée automatiquement':'Pochette de la chanson');root.dataset.kwCover=url;root.dataset.kwCoverGenerated=generated?'1':'0'}
  async function enhance(root){
    if(!root||root.dataset.kwCoverBusy==='1')return;root.dataset.kwCoverBusy='1';
-   try{const yt=youtubeThumb(root);if(yt){apply(root,yt);return}const {title,artist}=text(root);if(!title)return;const url=await lookup(title,artist);if(url)apply(root,url)}finally{root.dataset.kwCoverBusy='0'}
+   try{
+     const yt=youtubeThumb(root);if(yt){apply(root,yt,false);return}
+     const {title,artist}=text(root);if(!title)return;
+     const url=await lookup(title,artist);if(url)apply(root,url,false);else apply(root,generatedCover(title,artist),true)
+   }finally{root.dataset.kwCoverBusy='0'}
  }
  function scanCovers(){document.querySelectorAll('.track,.home-card,.queue-item,.youtube-result').forEach(enhance)}
 
@@ -86,5 +112,5 @@
  const obs=new MutationObserver(()=>{clearTimeout(obs.t);obs.t=setTimeout(scan,120)});
  function start(){scan();obs.observe(document.body,{childList:true,subtree:true});setInterval(scan,5000)}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
- window.KWSongCovers={version:'0.28.2',refresh:scanCovers,clearCache:()=>{localStorage.removeItem(CACHE_KEY);localStorage.removeItem(LEGACY_KEY);location.reload()}};
+ window.KWSongCovers={version:'0.28.3',refresh:scanCovers,clearCache:()=>{localStorage.removeItem(CACHE_KEY);for(const k of OLD_CACHE_KEYS)localStorage.removeItem(k);location.reload()}};
 })();
