@@ -20,6 +20,47 @@
         doc.head.appendChild(link);
       }
 
+      if(!doc.getElementById('kw60CenterFix')){
+        const style=doc.createElement('style');
+        style.id='kw60CenterFix';
+        style.textContent=`
+          body.birthday60 .home-hero{
+            text-align:center !important;
+          }
+          body.birthday60 .home-hero h1{
+            max-width:900px !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+            text-align:center !important;
+          }
+          body.birthday60 .home-hero > p{
+            max-width:900px !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+            text-align:center !important;
+          }
+          body.birthday60 .home-hero > .eyebrow,
+          body.birthday60 .home-hero > .home-search,
+          body.birthday60 .home-hero > .hero-actions{
+            margin-left:auto !important;
+            margin-right:auto !important;
+            text-align:center !important;
+          }
+          body.birthday60 .home-hero > .home-search{
+            width:min(100%,920px) !important;
+          }
+          body.birthday60 .home-hero > .hero-actions{
+            justify-content:center !important;
+          }
+          body.birthday60 .kw60-special-banner{
+            width:min(100%,1100px) !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+          }
+        `;
+        doc.head.appendChild(style);
+      }
+
       const brand=doc.querySelector('.brand');
       if(brand){
         brand.innerHTML='🎤 Karaoke<span>World</span><small> · SPÉCIAL LAURENT 60 ANS ✨</small>';
