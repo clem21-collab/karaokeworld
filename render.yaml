@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: karaokeworld-drive-oauth
+    runtime: python
+    plan: free
+    rootDir: oauth-server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: KW_FRONTEND_ORIGIN
+        value: https://clem21-collab.github.io
+      - key: KW_FIREBASE_PROJECT_ID
+        value: karaokeworld-d503f
+      - key: KW_GOOGLE_CLIENT_ID
+        sync: false
+      - key: KW_GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: KW_FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: KW_TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: KW_STATE_SECRET
+        generateValue: true
