@@ -1,6 +1,6 @@
 (()=>{
   const frame=document.getElementById('kwApp');
-  const cleanupUrl=new URL('./cleanup.css?v=5',location.href).href;
+  const cleanupUrl=new URL('./cleanup.css?v=6',location.href).href;
 
   const stageBackground=`
     radial-gradient(circle at 48% 10%,rgba(151,78,176,.18) 0%,transparent 22%),
@@ -46,14 +46,58 @@ html body.birthday60 .stage-lyrics-wrap::before{
   background:linear-gradient(105deg,transparent 10%,rgba(255,220,145,.035) 28%,transparent 43%),linear-gradient(255deg,transparent 15%,rgba(255,220,145,.025) 35%,transparent 48%),radial-gradient(ellipse at 50% 52%,rgba(255,207,100,.07),transparent 56%)!important;
 }
 html body.birthday60 .stage-lyrics-wrap::after{
-  content:none!important;
-  display:none!important;
-  border:0!important;
-  background:none!important;
-  box-shadow:none!important;
+  content:none!important;display:none!important;border:0!important;background:none!important;box-shadow:none!important;
 }
-html body.birthday60 .stage-lyrics-wrap>*{position:relative!important;z-index:2!important}
+html body.birthday60 .stage-lyrics-wrap>*{z-index:2!important}
 html body.birthday60 .stage-bg::after{content:none!important;display:none!important;animation:none!important;filter:none!important}
+
+/* Paroles plein écran : ligne active exactement au centre, précédente et suivante équilibrées. */
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-current,
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-prev,
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-next,
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-far{
+  position:absolute!important;
+  left:50%!important;
+  right:auto!important;
+  width:min(900px,82%)!important;
+  max-width:82%!important;
+  margin:0!important;
+  text-align:center!important;
+  transform:translate(-50%,-50%)!important;
+  transition:top .22s ease,opacity .22s ease,font-size .22s ease,filter .22s ease!important;
+}
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-current{
+  top:50%!important;
+  z-index:6!important;
+  opacity:1!important;
+  font-size:clamp(36px,3.7vw,62px)!important;
+  line-height:1.12!important;
+}
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-prev{
+  top:calc(50% - 155px)!important;
+  z-index:5!important;
+  opacity:.48!important;
+  font-size:clamp(23px,2.25vw,38px)!important;
+  line-height:1.18!important;
+  color:#a99e8c!important;
+  filter:none!important;
+}
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-next{
+  top:calc(50% + 155px)!important;
+  z-index:5!important;
+  opacity:.68!important;
+  font-size:clamp(24px,2.35vw,40px)!important;
+  line-height:1.18!important;
+  color:#c9bda4!important;
+  filter:none!important;
+}
+html body.birthday60 .stage-lyrics-wrap .stage-line.kw60-far{
+  top:50%!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  z-index:1!important;
+}
+
 html body.birthday60 .stage-video{
   background:linear-gradient(180deg,#071012 0%,#081315 100%)!important;
   border-left:1px solid rgba(218,170,73,.38)!important;
@@ -86,7 +130,6 @@ html body.birthday60 .karaoke-stage input[type="range"]{accent-color:#e9b749!imp
       link=d.createElement('link');
       link.id='kw60CleanupCss';
       link.rel='stylesheet';
-      d.head.appendChild(link);
     }
     link.href=cleanupUrl;
     d.head.appendChild(link);
@@ -98,6 +141,34 @@ html body.birthday60 .karaoke-stage input[type="range"]{accent-color:#e9b749!imp
     }
     style.textContent=forceCss;
     d.head.appendChild(style);
+  }
+
+  function centerLyrics(d){
+    const wrap=d.querySelector('.stage-lyrics-wrap');
+    if(!wrap)return;
+    const lines=[...wrap.querySelectorAll('.stage-line')];
+    if(!lines.length)return;
+
+    lines.forEach(line=>line.classList.remove('kw60-current','kw60-prev','kw60-next','kw60-far'));
+
+    const current=wrap.querySelector('.stage-line.active');
+    if(!current)return;
+    const index=lines.indexOf(current);
+    if(index<0)return;
+
+    current.classList.add('kw60-current');
+
+    let prev=wrap.querySelector('.stage-line.near:not(.active)');
+    let next=wrap.querySelector('.stage-line.next:not(.active)');
+    if(!prev&&index>0)prev=lines[index-1];
+    if(!next&&index<lines.length-1)next=lines[index+1];
+
+    if(prev&&prev!==current)prev.classList.add('kw60-prev');
+    if(next&&next!==current&&next!==prev)next.classList.add('kw60-next');
+
+    lines.forEach(line=>{
+      if(line!==current&&line!==prev&&line!==next)line.classList.add('kw60-far');
+    });
   }
 
   function forceStage(d){
@@ -116,6 +187,8 @@ html body.birthday60 .karaoke-stage input[type="range"]{accent-color:#e9b749!imp
       wrap.style.setProperty('overflow','hidden','important');
       wrap.style.setProperty('isolation','isolate','important');
     }
+
+    centerLyrics(d);
 
     const video=d.querySelector('.stage-video');
     if(video){
@@ -136,7 +209,7 @@ html body.birthday60 .karaoke-stage input[type="range"]{accent-color:#e9b749!imp
       d.__kw60StageObserver=new MutationObserver(()=>forceStage(d));
       d.__kw60StageObserver.observe(d.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
 
-      const timer=setInterval(()=>forceStage(d),500);
+      const timer=setInterval(()=>forceStage(d),220);
       frame.addEventListener('load',()=>clearInterval(timer),{once:true});
     }catch(e){console.error('Nettoyage thème 60 ans',e)}
   }
