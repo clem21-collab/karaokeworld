@@ -69,14 +69,13 @@ body.birthday60 .kw60-chips{justify-content:center!important;margin-top:12px!imp
   body.birthday60 .home-hero>.home-search{width:calc(100% - 34px)!important}
 }
 `;d.head.appendChild(s)}}
-function buildTop(d){const header=q(d,'header');if(!header||q(d,'.kw60-topnav'))return;
+function buildTop(d){q(d,'.kw60-sun')?.remove();const header=q(d,'header');if(!header||q(d,'.kw60-topnav'))return;
  const brand=q(d,'.brand');if(brand)brand.innerHTML='🎙 Karaoke<span>World</span>';
  const nav=el(d,'div','kw60-topnav');
  const items=[['home','⌂ Accueil'],['library','▦ Catalogue'],['playlist','☷ Playlists'],['library','♡ Favoris'],['library','♬ Préparation IA'],['settings','▲ Google Drive'],['settings','⚙ Paramètres']];
  items.forEach(([p,t],idx)=>{const b=el(d,'button',idx===0?'active':'',t);b.type='button';b.dataset.kwPage=p;if(idx===3)b.dataset.favs='1';b.onclick=()=>{clickPage(d,p);if(b.dataset.favs){setTimeout(()=>{const c=q(d,'#favoritesOnly');if(c&&!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}))}},100)}};nav.appendChild(b)});
  header.insertBefore(nav,q(d,'.top-actions'));
  const sr=el(d,'label','kw60-top-search','<span>⌕</span><input placeholder="Rechercher une chanson, un artiste...">');sr.querySelector('input').addEventListener('keydown',e=>{if(e.key==='Enter')search(d,e.target.value)});header.insertBefore(sr,q(d,'.top-actions'));
- const sun=el(d,'button','kw60-sun','☼');sun.type='button';header.insertBefore(sun,q(d,'.top-actions'));
  const top=q(d,'.top-actions');if(top&&!q(d,'.kw60-normal')){const b=el(d,'button','kw60-normal','↩ Version normale');b.type='button';b.onclick=()=>window.top.location.href='../';top.prepend(b)}
 }
 function buildSide(d){const side=q(d,'aside');if(!side||q(d,'.kw60-side-title'))return;
