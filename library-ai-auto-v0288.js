@@ -1,7 +1,7 @@
-/* KaraokeWorld v0.28.8 — préparation IA automatique après mise à jour de bibliothèque */
+/* KaraokeWorld v0.28.9 — préparation IA rapide : sources locales + Drive après calcul */
 (()=>{
   if(window.KaraokeWorldLibraryAiAuto?.installed)return;
-  const VERSION='0.28.8';
+  const VERSION='0.28.9';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
   const STEM_CACHE='karaokeworld-instrumental-v1';
@@ -14,6 +14,9 @@
   const relDir=f=>{const p=String(f?.webkitRelativePath||f?.name||'').replace(/\\/g,'/');return p.split('/').slice(0,-1).join('/')};
   const token=()=>{try{const t=sessionStorage.getItem(TOKEN_KEY)||'',exp=Number(sessionStorage.getItem(TOKEN_EXP_KEY)||0);return t&&exp>Date.now()+30000?t:''}catch(e){return''}};
   const status=(text,kind='')=>{const el=$('cloudUltraStarStatus');if(el){el.textContent=text;el.dataset.kind=kind}};
+  let lastLocalSongs=[];
+
+  function currentUser(){try{return cloudUser||cloudApi?.auth?.currentUser||null}catch(e){return window.cloudApi?.auth?.currentUser||null}}
 
   function findAudio(files,dir,name){
     const exact=name&&files.find(f=>relDir(f)===dir&&String(f.name||'').toLowerCase()===String(name).toLowerCase());
@@ -53,16 +56,52 @@
   }
 
   async function detectChangedAudio(fileList){
-    if(!token())return new Set();
     try{
-      const [songs,remote]=await Promise.all([localSongs(fileList),driveAudioInventory()]);
-      const changed=new Set();
+      const songs=await localSongs(fileList);lastLocalSongs=songs;
+      if(!token())return new Set();
+      const remote=await driveAudioInventory(),changed=new Set();
       for(const s of songs){
         const r=remote.get(s.songId);if(!r)continue;
         if(String(r.name||'')!==String(s.audio.name||'')||Number(r.size||0)!==Number(s.audio.size||0))changed.add(s.songId);
       }
       return changed;
-    }catch(e){console.warn('KaraokeWorld IA auto : détection audio modifié indisponible',e);return new Set()}
+    }catch(e){console.warn('KaraokeWorld IA auto : détection audio modifié indisponible',e);lastLocalSongs=[];return new Set()}
+  }
+
+  function bindLocalSources(songs=lastLocalSongs){
+    const byId=new Map((songs||[]).map(s=>[s.songId,s.audio]));
+    let list=[];try{list=Array.isArray(tracks)?tracks:[]}catch(e){}
+    const touched=[];
+    for(const t of list){
+      const id=t?.cloudBackupDocId||t?.cloudDocId||String(t?.id||'').replace(/^cloudus_/,'');
+      const file=byId.get(id);if(!(file instanceof Blob))continue;
+      touched.push({t,had:Object.prototype.hasOwnProperty.call(t,'blob'),old:t.blob});
+      t.blob=file;
+    }
+    return {count:touched.length,release(){for(const x of touched){if(x.had)x.t.blob=x.old;else try{delete x.t.blob}catch(e){x.t.blob=undefined}}}};
+  }
+
+  function suspendDriveToken(){
+    try{
+      const savedToken=sessionStorage.getItem(TOKEN_KEY),savedExp=sessionStorage.getItem(TOKEN_EXP_KEY);
+      if(!savedToken)return {active:false,restore(){}};
+      sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(TOKEN_EXP_KEY);
+      let restored=false;
+      return {active:true,restore({notify=false}={}){
+        if(restored)return;restored=true;
+        if(savedToken)sessionStorage.setItem(TOKEN_KEY,savedToken);
+        if(savedExp)sessionStorage.setItem(TOKEN_EXP_KEY,savedExp);
+        if(notify)window.dispatchEvent(new CustomEvent('kw-drive-token',{detail:{source:'ai-fast'}}));
+      }};
+    }catch(e){return {active:false,restore(){}}}
+  }
+
+  async function webGpuAvailable(){
+    try{
+      if(!navigator?.gpu)return false;
+      const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
+      return !!adapter;
+    }catch(e){return !!navigator?.gpu}
   }
 
   async function clearOldInstrumentalCache(track){
@@ -79,13 +118,18 @@
   async function invalidateChanged(changedIds){
     if(!changedIds?.size)return 0;
     let n=0,list=[];try{list=Array.isArray(tracks)?tracks:[]}catch(e){}
+    const u=currentUser();
     for(const t of list){
       const id=t?.cloudBackupDocId||t?.cloudDocId||String(t?.id||'').replace(/^cloudus_/,'');
       if(!changedIds.has(id))continue;
       const m=t?.cloudBackupManifest||t?.cloudManifest;if(!m)continue;
       await clearOldInstrumentalCache(t);
-      m.instrumentalSourceKey='__kw_audio_changed__'+Date.now();
-      n++;
+      const marker='__kw_audio_changed__'+Date.now();m.instrumentalSourceKey=marker;m.instrumentalUpdatedAt=Date.now();n++;
+      try{
+        if(u&&typeof cloudApi!=='undefined'&&cloudApi?.setDoc&&cloudApi?.doc&&cloudApi?.fs){
+          await cloudApi.setDoc(cloudApi.doc(cloudApi.fs,'users',u.uid,'ultrastar',id),{instrumentalSourceKey:marker,instrumentalUpdatedAt:Date.now()},{merge:true});
+        }
+      }catch(e){console.warn('KaraokeWorld IA auto : invalidation Drive non persistée',id,e)}
     }
     return n;
   }
@@ -97,18 +141,39 @@
     const before=await ai.countPrepared();
     const missing=Math.max(0,(before?.total||0)-(before?.ready||0));
     if(!missing){status(`✅ Bibliothèque à jour · ${before.total||0} chanson${before.total>1?'s':''} déjà préparée${before.total>1?'s':''} par l’IA. Aucun recalcul.`);return}
-    status(`🤖 Bibliothèque à jour · préparation IA automatique de ${missing} chanson${missing>1?'s':''} seulement…`);
-    await ai.startAll();
-    const after=await ai.countPrepared();
-    const left=Math.max(0,(after?.total||0)-(after?.ready||0));
-    if(left)status(`⚠️ Bibliothèque mise à jour · IA : ${after.ready}/${after.total} prêtes · ${left} chanson${left>1?'s':''} reste${left>1?'nt':''} à préparer.`,'error');
-    else status(`✅ Bibliothèque mise à jour · IA terminée · ${after.ready}/${after.total} chansons prêtes. Les anciennes préparations n’ont pas été refaites.`);
+
+    const local=bindLocalSources(),gpu=await webGpuAvailable();
+    const backend=gpu?'⚡ WebGPU':'🐢 WASM/CPU';
+    let pause={active:false,restore(){}};
+    try{
+      if(local.count){
+        pause=suspendDriveToken();
+        status(`🤖 IA rapide · ${missing} chanson${missing>1?'s':''} à préparer · ${backend} · fichiers locaux utilisés, Drive sera synchronisé après.`);
+      }else status(`🤖 Préparation IA de ${missing} chanson${missing>1?'s':''} · ${backend}…`);
+
+      await ai.startAll();
+      pause.restore();
+
+      let after=await ai.countPrepared(),left=Math.max(0,(after?.total||0)-(after?.ready||0));
+      if(left&&local.count){
+        status(`🤖 ${after.ready}/${after.total} prêtes en mode rapide · ${left} restante${left>1?'s':''} nécessite${left>1?'nt':''} Drive…`);
+        await ai.startAll();
+        after=await ai.countPrepared();left=Math.max(0,(after?.total||0)-(after?.ready||0));
+      }
+
+      if(token())window.dispatchEvent(new CustomEvent('kw-drive-token',{detail:{source:'ai-fast'}}));
+      if(left)status(`⚠️ Bibliothèque mise à jour · IA : ${after.ready}/${after.total} prêtes · ${left} chanson${left>1?'s':''} reste${left>1?'nt':''} à préparer.`,'error');
+      else status(`✅ Bibliothèque mise à jour · IA terminée · ${after.ready}/${after.total} chansons prêtes · ${backend}. ☁ Sauvegarde Drive lancée sans recalculer les chansons.`);
+    }finally{
+      pause.restore();local.release();
+    }
   }
 
   function improveCopy(){
     const simple=$('kwLibrarySimpleBox');if(!simple)return;
     const text=simple.querySelector('.muted');
     if(text&&!/IA automatique/i.test(text.textContent||''))text.textContent+=' Préparation IA automatique uniquement pour les chansons nouvelles ou modifiées.';
+    if(text&&!/fichiers locaux/i.test(text.textContent||''))text.textContent+=' Les fichiers locaux sont utilisés directement pour accélérer le calcul.';
   }
 
   function install(){
@@ -134,6 +199,6 @@
     [900,1800,3500,6000,9000].forEach(ms=>setTimeout(()=>{install();improveCopy()},ms));
   }
 
-  window.KaraokeWorldLibraryAiAuto={version:VERSION,installed:true,install,detectChangedAudio,autoPrepare};
+  window.KaraokeWorldLibraryAiAuto={version:VERSION,installed:true,install,detectChangedAudio,autoPrepare,bindLocalSources,webGpuAvailable};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
