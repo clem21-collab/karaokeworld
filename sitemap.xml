@@ -2,7 +2,14 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://clem21-collab.github.io/karaokeworld/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-10-28</lastmod>
+  </url>
+  <url>
+    <loc>https://clem21-collab.github.io/karaokeworld/a-propos.html</loc>
+    <lastmod>2026-10-28</lastmod>
+  </url>
+  <url>
+    <loc>https://clem21-collab.github.io/karaokeworld/guide.html</loc>
+    <lastmod>2026-10-28</lastmod>
   </url>
 </urlset>
