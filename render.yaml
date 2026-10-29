@@ -18,3 +18,5 @@ services:
         generateValue: true
       - key: KW_STATE_SECRET
         generateValue: true
+      - key: KW_YOUTUBE_API_KEY
+        sync: false
