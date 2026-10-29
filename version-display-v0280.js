@@ -1,8 +1,8 @@
-/* KaraokeWorld v0.28.9 — affichage de version stable */
+/* KaraokeWorld v0.29.0 — affichage de version stable */
 (()=>{
   if(window.KaraokeWorldVersionDisplay?.installed)return;
-  const VERSION='0.28.9';
-  const LABEL='BETA · v0.28.9 · Préparation IA accélérée ⚡';
+  const VERSION='0.29.0';
+  const LABEL='BETA · v0.29.0 · Catalogue public 🌐';
 
   function install(){
     const brand=document.querySelector('.brand');
@@ -23,7 +23,6 @@
   function start(){
     install();
     [250,700,1500,3000,5000].forEach(ms=>setTimeout(install,ms));
-    setInterval(install,2000);
   }
 
   window.KaraokeWorldVersionDisplay={version:VERSION,installed:true,refresh:install};
