@@ -1,13 +1,16 @@
 from app import app
-from fastapi import Query
-import threading, time, unicodedata, re
+from fastapi import Query, HTTPException
+import os, threading, time, unicodedata, re
 import requests
 
 _MB_LOCK = threading.Lock()
 _MB_LAST = 0.0
-_MB_UA = 'KaraokeWorld/0.28.3 (https://clem21-collab.github.io/karaokeworld/)'
+_MB_UA = 'KaraokeWorld/0.29.0 (https://clem21-collab.github.io/karaokeworld/)'
 _COVER_CACHE = {}
 _COVER_CACHE_TTL = 7 * 24 * 60 * 60
+_YOUTUBE_KEY = (os.getenv('KW_YOUTUBE_API_KEY') or os.getenv('YOUTUBE_API_KEY') or '').strip()
+_YOUTUBE_CACHE = {}
+_YOUTUBE_CACHE_TTL = 6 * 60 * 60
 
 
 def _norm(value):
@@ -143,3 +146,96 @@ def cover_search(title: str = Query(min_length=1, max_length=200), artist: str =
         for key, _ in oldest:
             _COVER_CACHE.pop(key, None)
     return {'url': url, 'source': source}
+
+
+def _youtube_request(path, params):
+    if not _YOUTUBE_KEY:
+        raise HTTPException(503, 'La recherche YouTube publique n’est pas encore configurée sur le serveur.')
+    payload = dict(params)
+    payload['key'] = _YOUTUBE_KEY
+    try:
+        response = requests.get(
+            f'https://www.googleapis.com/youtube/v3/{path}',
+            params=payload,
+            headers={'User-Agent': _MB_UA, 'Accept': 'application/json'},
+            timeout=15,
+        )
+        data = response.json()
+    except requests.RequestException as exc:
+        raise HTTPException(502, f'YouTube indisponible: {type(exc).__name__}')
+    except ValueError:
+        raise HTTPException(502, 'Réponse YouTube invalide.')
+    if not response.ok:
+        detail = ((data.get('error') or {}).get('message') if isinstance(data, dict) else None) or f'HTTP {response.status_code}'
+        raise HTTPException(429 if response.status_code == 403 and 'quota' in detail.lower() else 502, f'YouTube: {detail}')
+    return data
+
+
+def _public_youtube_search(query, mode):
+    search_text = f'{query} karaoké instrumental' if mode == 'karaoke' else f'{query} officiel audio'
+    data = _youtube_request('search', {
+        'part': 'snippet',
+        'type': 'video',
+        'maxResults': '12',
+        'q': search_text,
+        'videoCategoryId': '10',
+        'videoEmbeddable': 'true',
+        'videoSyndicated': 'true',
+        'relevanceLanguage': 'fr',
+        'regionCode': 'FR',
+        'safeSearch': 'moderate',
+    })
+    raw = [x for x in (data.get('items') or []) if ((x.get('id') or {}).get('videoId'))]
+    ids = [x['id']['videoId'] for x in raw]
+    if not ids:
+        return []
+    details = _youtube_request('videos', {
+        'part': 'status,contentDetails',
+        'id': ','.join(ids),
+    })
+    by_id = {x.get('id'): x for x in (details.get('items') or [])}
+    out = []
+    for item in raw:
+        video_id = item['id']['videoId']
+        detail = by_id.get(video_id) or {}
+        status = detail.get('status') or {}
+        restriction = (detail.get('contentDetails') or {}).get('regionRestriction') or {}
+        if status.get('embeddable') is False:
+            continue
+        if 'FR' in (restriction.get('blocked') or []):
+            continue
+        sn = item.get('snippet') or {}
+        thumbs = sn.get('thumbnails') or {}
+        out.append({
+            'id': video_id,
+            'title': sn.get('title') or 'Vidéo YouTube',
+            'channel': sn.get('channelTitle') or '',
+            'thumbnail': (thumbs.get('medium') or thumbs.get('high') or thumbs.get('default') or {}).get('url') or '',
+            'publishedAt': sn.get('publishedAt') or '',
+        })
+    return out
+
+
+@app.get('/youtube/status')
+def youtube_status():
+    return {'configured': bool(_YOUTUBE_KEY), 'publicSearch': True}
+
+
+@app.get('/youtube/search')
+def youtube_search(
+    q: str = Query(min_length=1, max_length=180),
+    mode: str = Query(default='original', pattern='^(original|karaoke)$'),
+):
+    query = ' '.join(str(q or '').split()).strip()
+    cache_key = (_norm(query), mode)
+    now = time.time()
+    cached = _YOUTUBE_CACHE.get(cache_key)
+    if cached and now - cached[0] < _YOUTUBE_CACHE_TTL:
+        return {'items': cached[1], 'mode': mode, 'cached': True}
+    items = _public_youtube_search(query, mode)
+    _YOUTUBE_CACHE[cache_key] = (now, items)
+    if len(_YOUTUBE_CACHE) > 1200:
+        oldest = sorted(_YOUTUBE_CACHE.items(), key=lambda x: x[1][0])[:250]
+        for key, _ in oldest:
+            _YOUTUBE_CACHE.pop(key, None)
+    return {'items': items, 'mode': mode, 'cached': False}
