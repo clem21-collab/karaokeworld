@@ -27,25 +27,26 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 
-// v0.28.9 — chargeur des correctifs complémentaires.
+// v0.29.0 — chargeur des extensions complémentaires.
 // Le moteur vidéo principal reste chargé par recently-sung.js pour éviter deux files concurrentes.
 (()=>{
   const addons=[
-    {src:'./hotfix-v0267.js?v=0284',key:'hotfix'},
-    {src:'./video-once-v0272.js?v=0284',key:'video-once'},
-    {src:'./library-dedupe-v0275.js?v=0284',key:'dedupe'},
-    {src:'./vocal-separation-v0276.js?v=0284',key:'vocals'},
-    {src:'./vocal-button-fix-v0277.js?v=0284',key:'voice-button-fix'},
-    {src:'./vocal-loudness-v0278.js?v=0284',key:'voice-loudness'},
-    {src:'./drive-token-expiry-v0280.js?v=0284',key:'drive-token-expiry'},
-    {src:'./drive-oauth-default-v0281.js?v=0284',key:'drive-oauth-default'},
-    {src:'./drive-oauth-refresh-v0281.js?v=0284',key:'drive-oauth-refresh'},
-    {src:'./nav-ultrastar-scope-v0284.js?v=0284',key:'nav-ultrastar-scope'},
-    {src:'./ultrastar-folder-sync-v0285.js?v=0285',key:'ultrastar-folder-sync'},
-    {src:'./drive-incremental-upload-v0286.js?v=0286',key:'drive-incremental-upload'},
-    {src:'./library-update-simple-v0287.js?v=0287',key:'library-update-simple'},
-    {src:'./library-ai-auto-v0288.js?v=0289',key:'library-ai-auto'},
-    {src:'./version-display-v0280.js?v=0289',key:'version-display'}
+    {src:'./hotfix-v0267.js?v=0290',key:'hotfix'},
+    {src:'./video-once-v0272.js?v=0290',key:'video-once'},
+    {src:'./library-dedupe-v0275.js?v=0290',key:'dedupe'},
+    {src:'./vocal-separation-v0276.js?v=0290',key:'vocals'},
+    {src:'./vocal-button-fix-v0277.js?v=0290',key:'voice-button-fix'},
+    {src:'./vocal-loudness-v0278.js?v=0290',key:'voice-loudness'},
+    {src:'./drive-token-expiry-v0280.js?v=0290',key:'drive-token-expiry'},
+    {src:'./drive-oauth-default-v0281.js?v=0290',key:'drive-oauth-default'},
+    {src:'./drive-oauth-refresh-v0281.js?v=0290',key:'drive-oauth-refresh'},
+    {src:'./nav-ultrastar-scope-v0284.js?v=0290',key:'nav-ultrastar-scope'},
+    {src:'./ultrastar-folder-sync-v0285.js?v=0290',key:'ultrastar-folder-sync'},
+    {src:'./drive-incremental-upload-v0286.js?v=0290',key:'drive-incremental-upload'},
+    {src:'./library-update-simple-v0287.js?v=0290',key:'library-update-simple'},
+    {src:'./library-ai-auto-v0288.js?v=0290',key:'library-ai-auto'},
+    {src:'./public-catalog-v0290.js?v=0290',key:'public-catalog'},
+    {src:'./version-display-v0280.js?v=0290',key:'version-display'}
   ];
   function load(i=0){
     if(i>=addons.length)return;
