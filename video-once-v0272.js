@@ -1,19 +1,16 @@
 /* KaraokeWorld v0.27.4 — conversion vidéo une seule fois + réutilisation cache/Drive + dédoublonnage bibliothèque */
 (()=>{
   const VERSION='0.27.4';
-  const CACHE='karaokeworld-converted-video-v1';
   const TOKEN_KEY='kw_drive_access_token_v1';
   const TOKEN_EXP_KEY='kw_drive_access_exp_v1';
   const VIDEO_RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
   const $=id=>document.getElementById(id);
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-  const key=f=>[f?.name||'video',f?.size||0,f?.lastModified||0].join('|');
   const norm=s=>String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   const songKey=t=>norm(`${t?.artist||''}|${t?.title||''}`);
-  function cacheUrl(f){let h=2166136261,s=key(f);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href}
   async function getPreparedBlob(f){
     if(!f)return null;
-    try{const hit=await(await caches.open(CACHE)).match(cacheUrl(f));return hit?await hit.blob():null}catch(e){return null}
+    try{return await window.KaraokeWorldVideoCompat?.getConverted(f)||null}catch(e){return null}
   }
   async function getPreparedFile(f){
     const blob=await getPreparedBlob(f);if(!blob)return null;
@@ -28,17 +25,6 @@
     api.conversionIsPersistent=true;
     api.version=VERSION;
     return true;
-  }
-  async function reuseForTracks(){
-    try{
-      if(typeof tracks==='undefined'||!Array.isArray(tracks))return;
-      for(const t of tracks){
-        if(t?.kind!=='ultrastar'||!t.videoBlob||t._kwPreparedChecked)continue;
-        t._kwPreparedChecked=true;
-        const blob=await getPreparedBlob(t.videoBlob);
-        if(blob){t.compatVideoBlob=blob;t._kwPreparedFromCache=true}
-      }
-    }catch(e){console.warn('KaraokeWorld conversion unique: réutilisation cache',e)}
   }
   function reconcileCloudDuplicates(){
     try{
@@ -77,7 +63,7 @@
     let n=$('ultraStarConversionOnce');if(n)return true;
     n=document.createElement('div');n.id='ultraStarConversionOnce';n.className='muted';
     n.style.cssText='font-size:11px;margin-top:6px';
-    n.textContent='✅ Conversion unique active : une vidéo déjà préparée est réutilisée automatiquement. Le cache de conversion est conservé pendant les mises à jour de KaraokeWorld.';
+    n.textContent='Les vidéos préparées sont réutilisées tant qu’elles restent dans le stockage de ce navigateur. Les échecs mémorisés peuvent être relancés manuellement.';
     panel.appendChild(n);return true;
   }
   async function prepareFilesForDrive(files){
@@ -130,14 +116,13 @@
   async function start(){
     for(let i=0;i<80;i++){
       attachApi();patchDriveInput();ensureNotice();markVersion();reconcileCloudDuplicates();
-      if(i%5===0)reuseForTracks();
       if(attachApi()&&patchDriveInput()&&ensureNotice()&&i>10)break;
       await sleep(250);
     }
-    reuseForTracks();reconcileCloudDuplicates();migrateLegacySongFolders();
+    reconcileCloudDuplicates();migrateLegacySongFolders();
     window.addEventListener('kw-drive-token',()=>setTimeout(()=>{migrateLegacySongFolders();reconcileCloudDuplicates()},300));
-    setInterval(()=>{attachApi();patchDriveInput();ensureNotice();reuseForTracks();reconcileCloudDuplicates();markVersion()},2500);
+    setInterval(()=>{attachApi();patchDriveInput();ensureNotice();reconcileCloudDuplicates();markVersion()},2500);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,reuseForTracks,migrateLegacySongFolders,reconcileCloudDuplicates};
+  window.KaraokeWorldVideoOnce={version:VERSION,getPreparedBlob,getPreparedFile,migrateLegacySongFolders,reconcileCloudDuplicates};
 })();

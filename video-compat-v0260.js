@@ -47,13 +47,15 @@
     for(let i=0;i<base.length;i++){h^=base.charCodeAt(i);h=Math.imul(h,16777619)}
     return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href;
   }
-  async function getCached(file){
-    if(!('caches' in window))return null;
-    try{const r=await (await caches.open(CACHE_NAME)).match(cacheKey(file));return r?await r.blob():null}catch(e){return null}
+  async function matchConverted(file){
+    return (await caches.open(CACHE_NAME)).match(cacheKey(file));
   }
-  async function putCached(file,blob){
-    if(!('caches' in window))return;
-    try{await (await caches.open(CACHE_NAME)).put(cacheKey(file),new Response(blob,{headers:{'Content-Type':'video/mp4'}}))}catch(e){}
+  async function getConverted(file){
+    const response=await matchConverted(file);
+    return response?response.blob():null;
+  }
+  async function putConverted(file,blob){
+    await (await caches.open(CACHE_NAME)).put(cacheKey(file),new Response(blob,{headers:{'Content-Type':'video/mp4'}}));
   }
 
   function waitPlayable(v,timeout=4500){
@@ -136,12 +138,14 @@
   }
 
   async function prepare(track,token){
-    const file=track?.compatVideoBlob||track?.videoBlob;
+    const file=track?.videoBlob||track?.compatVideoBlob;
     if(!file){hideProgress();return}
     const v=videoElement();if(!v)return;
     v.classList.remove('hidden');
 
-    const cached=await getCached(file);
+    let cached,cacheUnavailable=false;
+    try{cached=await getConverted(file)}catch(error){cacheUnavailable=true;console.warn('Cache vidéo inaccessible',error)}
+    if(token!==compat.token)return;
     if(cached&&token===compat.token&&await applyBlob(cached,token,'Vidéo convertie en cache'))return;
 
     const e=extOf(file.name||track.videoName);
@@ -153,12 +157,18 @@
     if(await tryMpegts(file,token))return;
     if(token!==compat.token)return;
 
+    if(cached||cacheUnavailable||window.KaraokeWorldVideoPreconvert?.shouldSkipConversion(file)){
+      v.classList.add('hidden');hideProgress();
+      setState('Vidéo indisponible · audio + paroles disponibles');
+      return;
+    }
+
     let out=await convert(file,'remux',token);
-    if(out&&token===compat.token&&await applyBlob(out,token,'Vidéo adaptée')){await putCached(file,out);stopWorker();return}
+    if(out&&token===compat.token&&await applyBlob(out,token,'Vidéo adaptée')){await putConverted(file,out).catch(error=>console.warn('Sauvegarde vidéo impossible',error));stopWorker();return}
     if(token!==compat.token)return;
 
     out=await convert(file,'transcode',token);
-    if(out&&token===compat.token&&await applyBlob(out,token,'Vidéo convertie')){await putCached(file,out);stopWorker();return}
+    if(out&&token===compat.token&&await applyBlob(out,token,'Vidéo convertie')){await putConverted(file,out).catch(error=>console.warn('Sauvegarde vidéo impossible',error));stopWorker();return}
 
     stopWorker();hideProgress();
     if(token===compat.token){v.classList.add('hidden');setState(`Vidéo non convertible automatiquement (${track.videoName||file.name||'format inconnu'}) · audio + paroles disponibles`)}
@@ -186,5 +196,5 @@
   window.syncUltraStarVideo=syncVideo;
   try{window.ultraStarVideoSupported=f=>VIDEO_RX.test(String(f?.name||f||''))}catch(e){}
 
-  window.KaraokeWorldVideoCompat={version:'0.26.0',clearConvertedCache:async()=>{try{await caches.delete(CACHE_NAME);return true}catch(e){return false}}};
+  window.KaraokeWorldVideoCompat={version:'0.26.0',matchConverted,getConverted,putConverted,clearConvertedCache:async()=>{try{await caches.delete(CACHE_NAME);return true}catch(e){return false}}};
 })();
