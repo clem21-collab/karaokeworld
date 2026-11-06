@@ -416,49 +416,64 @@ function usNorm(s){return String(s||"").normalize("NFD").replace(/\p{Diacritic}/
 function usDecode(buf){for(const enc of ["utf-8","windows-1252","iso-8859-1"]){try{return new TextDecoder(enc,{fatal:enc==="utf-8"}).decode(buf)}catch(e){}}return new TextDecoder().decode(buf)}
 function parseUltraStar(txt){
   const meta={}, raw=[]; let cur=[];
-  const rx=/^([:*F])\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/;
+  const rx=/^([:*FRG])\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/;
   for(let line of txt.split(/\r?\n/)){
     line=line.trimEnd();
     if(line.startsWith("#")&&line.includes(":")){const i=line.indexOf(":");meta[line.slice(1,i).toUpperCase()]=line.slice(i+1).trim();continue}
     if(line.startsWith("-")){if(cur.length){raw.push(cur);cur=[]}continue}
-    if(line==="E"){if(cur.length)raw.push(cur);break}
+    if(line==="E")break
     const m=line.match(rx);if(m)cur.push({start:+m[2],dur:+m[3],pitch:+m[4],text:m[5]});
   }
+  if(cur.length)raw.push(cur);
   const bpm=parseFloat(String(meta.BPM||"").replace(",",".")), gap=parseFloat(String(meta.GAP||"").replace(",","."));
-  if(!bpm||!Number.isFinite(gap)||!raw.length)throw Error("TXT UltraStar invalide");
+  if(!Number.isFinite(bpm)||bpm<=0)throw Error("#BPM absent ou invalide");
+  if(!Number.isFinite(gap))throw Error("#GAP absent ou invalide");
+  if(!raw.length)throw Error("Aucune note UltraStar reconnue");
   const beatMs=60000/(bpm*4);
   const groups=raw.map(a=>{const syllables=a.map(n=>({...n,start_s:gap/1000+n.start*beatMs/1000,end_s:gap/1000+(n.start+n.dur)*beatMs/1000}));return{syllables,start_s:syllables[0].start_s,end_s:Math.max(...syllables.map(x=>x.end_s))}});
   const lines=groups.map(g=>({time:g.start_s,text:g.syllables.map(x=>x.text).join("").trim()}));
   return {meta,bpm,gap,groups,lines};
 }
 async function importUltraStarFolder(fileList){
-  const files=[...fileList], txts=files.filter(f=>/\.txt$/i.test(f.name));let added=0,missing=0,bad=0;
+  const files=[...fileList], txts=files.filter(f=>/\.txt$/i.test(f.name));let added=0,missing=0;
+  const bad=[],videos=[];
   $("ultraStarStatus").textContent=`Analyse de ${txts.length} fichiers UltraStar…`;
   for(const tf of txts){
     try{
       const us=parseUltraStar(usDecode(await tf.arrayBuffer()));
       const dir=tf.webkitRelativePath.split("/").slice(0,-1).join("/");
       const wanted=(us.meta.MP3||"").split(/[\\/]/).pop();
-      const audio=files.find(f=>f.webkitRelativePath===dir+"/"+wanted)||
-                  files.find(f=>f.webkitRelativePath.startsWith(dir+"/")&&/\.(mp3|ogg|m4a|wav)$/i.test(f.name));
+      const audio=files.find(f=>wanted&&f.webkitRelativePath?.toLowerCase()===(dir+"/"+wanted).toLowerCase())||
+                  files.find(f=>f.webkitRelativePath?.split("/").slice(0,-1).join("/")===dir&&/\.(mp3|ogg|m4a|wav)$/i.test(f.name));
       if(!audio){missing++;continue}
       const id="ultrastar_"+usNorm((us.meta.ARTIST||"")+"_"+(us.meta.TITLE||tf.name))+"_"+added;
       const coverName=(us.meta.COVER||"").split(/[\\/]/).pop();
       const cover=coverName?files.find(f=>f.webkitRelativePath===dir+"/"+coverName):null;
-      // Vidéo UltraStar : priorité au nom exact indiqué par #VIDEO, sinon première vidéo du même dossier.
+      // Un OGG audio ne doit pas être choisi comme vidéo par défaut.
       const videoName=(us.meta.VIDEO||"").split(/[\\/]/).pop();
-      const video=files.find(f=>videoName && f.webkitRelativePath===dir+"/"+videoName) ||
-                  files.find(f=>f.webkitRelativePath.startsWith(dir+"/") && /\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv)$/i.test(f.name));
+      const sameFolder=f=>f!==audio&&f.webkitRelativePath?.split("/").slice(0,-1).join("/")===dir;
+      const video=videoName
+        ? files.find(f=>sameFolder(f)&&f.name.toLowerCase()===videoName.toLowerCase())
+        : files.find(f=>sameFolder(f)&&!/\.ogg$/i.test(f.name)&&(window.ultraStarVideoSupported?.(f)??/\.(mp4|m4v|webm|ogv|mov|mpeg|mpg|flv)$/i.test(f.name)));
       const videoGapRaw=parseFloat(String(us.meta.VIDEOGAP||"0").replace(",","."));
       const t={id,title:us.meta.TITLE||tf.name.replace(/\.txt$/i,""),artist:us.meta.ARTIST||"Artiste inconnu",genre:us.meta.GENRE||"Sans genre",emoji:"🎤",kind:"ultrastar",type:"audio",blob:audio,url:URL.createObjectURL(audio),created:Date.now(),lrc:us.lines,ultraStar:{bpm:us.bpm,gap:us.gap,groups:us.groups,meta:us.meta,video:videoName||"",videoGap:Number.isFinite(videoGapRaw)?videoGapRaw:0},videoBlob:video||null,videoName:video?.name||"",coverUrl:cover?URL.createObjectURL(cover):""};
       // session import: exact File objects remain local and are not uploaded
       tracks=tracks.filter(x=>!(x.kind==="ultrastar"&&usNorm(x.artist+"|"+x.title)===usNorm(t.artist+"|"+t.title)));
       tracks.unshift(t);added++;
-    }catch(e){bad++}
+      if(video)videos.push(video);
+    }catch(e){bad.push([tf.webkitRelativePath||tf.name,e.message||String(e)])}
   }
   drawTracks();drawPlaylists();
   $("ultraStarBadge").textContent=`${added} prête${added!==1?"s":""}`;
-  $("ultraStarStatus").textContent=`✅ ${added} chansons exactes ajoutées à KaraokeWorld${missing?` · ${missing} sans audio correspondant`:""}${bad?` · ${bad} TXT non compatibles`:""}.`;
+  const status=$("ultraStarStatus");
+  status.textContent=`✅ ${added} chansons exactes ajoutées à KaraokeWorld${missing?` · ${missing} sans audio correspondant`:""}${bad.length?` · ${bad.length} TXT non compatible${bad.length>1?"s":""}`:""}.`;
+  if(bad.length){
+    const details=document.createElement("details"),summary=document.createElement("summary"),list=document.createElement("ul");
+    summary.textContent="Voir les TXT ignorés";
+    for(const [name,reason] of bad){const item=document.createElement("li");item.textContent=`${name} · ${reason}`;list.appendChild(item)}
+    details.append(summary,list);status.appendChild(details);
+  }
+  window.KaraokeWorldVideoPreconvert?.start(videos);
 }
 const originalPlayTrack=playTrack;
 playTrack=function(id){

@@ -10,7 +10,6 @@
 
   function $(id){return document.getElementById(id)}
   function extOf(name){return (String(name||'').toLowerCase().match(/\.([a-z0-9]+)$/)||[])[1]||''}
-  function norm(s){return String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
   function videoElement(){return $('ultraStarStageVideo')}
   function setState(text){const s=$('state');if(s)s.textContent=text}
 
@@ -183,34 +182,9 @@
     if(a&&!a.paused){if(v.paused)v.play().catch(()=>{})}else if(!v.paused){try{v.pause()}catch(e){}}
   }
 
-  async function enrichFolder(fileList){
-    const files=[...fileList];const txts=files.filter(f=>/\.txt$/i.test(f.name));
-    for(const tf of txts){
-      try{
-        const text=await tf.text(),meta={};
-        for(const line of text.split(/\r?\n/))if(line.startsWith('#')&&line.includes(':')){const i=line.indexOf(':');meta[line.slice(1,i).toUpperCase()]=line.slice(i+1).trim()}
-        const title=meta.TITLE||tf.name.replace(/\.txt$/i,''),artist=meta.ARTIST||'Artiste inconnu';
-        const dir=(tf.webkitRelativePath||tf.name).split('/').slice(0,-1).join('/');
-        const wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop();
-        const exact=wanted?files.find(f=>((f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir)&&f.name.toLowerCase()===wanted.toLowerCase()):null;
-        const candidate=exact||files.find(f=>((f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir)&&VIDEO_RX.test(f.name));
-        if(!candidate)continue;
-        let track=null;
-        for(let tries=0;tries<40&&!track;tries++){
-          try{track=tracks.find(t=>t.kind==='ultrastar'&&norm(`${t.artist}|${t.title}`)===norm(`${artist}|${title}`))}catch(e){}
-          if(!track)await new Promise(r=>setTimeout(r,100));
-        }
-        if(track){track.videoBlob=candidate;track.videoName=candidate.name;track.compatVideoBlob=candidate}
-      }catch(e){console.warn('Association vidéo UltraStar',e)}
-    }
-  }
-
   window.setUltraStarStageVideo=setVideo;
   window.syncUltraStarVideo=syncVideo;
   try{window.ultraStarVideoSupported=f=>VIDEO_RX.test(String(f?.name||f||''))}catch(e){}
-
-  const folder=$('ultraStarFolder');
-  if(folder)folder.addEventListener('change',e=>enrichFolder(e.target.files));
 
   window.KaraokeWorldVideoCompat={version:'0.26.0',clearConvertedCache:async()=>{try{await caches.delete(CACHE_NAME);return true}catch(e){return false}}};
 })();

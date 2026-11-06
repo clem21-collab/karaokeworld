@@ -1,16 +1,16 @@
 /* KaraokeWorld v0.26.5 — dossier UltraStar mémorisé + arrêt/reprise + cycle de vie */
 (()=>{
-const CACHE='karaokeworld-converted-video-v1',WORKER='./video-compat-worker-v0260.js',RX=/\.(mp4|m4v|webm|ogv|ogg|mov|mpeg|mpg|flv|avi|mkv|wmv|vob|ts|m2ts|mts|3gp|3g2)$/i;
+const CACHE='karaokeworld-converted-video-v1',WORKER='./video-compat-worker-v0260.js';
 const HANDLE_DB='karaokeworld_handles',HANDLE_STORE='handles',HANDLE_KEY='ultrastar-root';
 const jobs=new Map(),active=new Map(),workerTasks=new Map();
-let token=0,total=0,done=0,currentRun=null,ticker=0,rememberedHandle=null,backgroundSince=0,folderScanBusy=false;
+let total=0,done=0,currentRun=null,ticker=0,rememberedHandle=null,backgroundSince=0,folderScanBusy=false;
 const $=id=>document.getElementById(id),key=f=>[f?.name||'video',f?.size||0,f?.lastModified||0].join('|'),limit=n=>Math.max(1,Math.min(4,parseInt(n,10)||2));
 const concurrency=()=>limit(localStorage.getItem('kw_video_concurrency')||2),setConcurrency=n=>localStorage.setItem('kw_video_concurrency',String(limit(n)));
+function errorMessage(error){return error?.message||String(error)}
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function norm(s){return String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function ck(f){let h=2166136261,s=key(f);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return new URL(`./__kw_video_cache__/v1-${(h>>>0).toString(16)}.mp4`,location.href).href}
 async function cached(f){try{return !!(await(await caches.open(CACHE)).match(ck(f)))}catch(e){return false}}
-async function cache(f,b){try{await(await caches.open(CACHE)).put(ck(f),new Response(b,{headers:{'Content-Type':'video/mp4'}}))}catch(e){}}
+async function cache(f,b){await(await caches.open(CACHE)).put(ck(f),new Response(b,{headers:{'Content-Type':'video/mp4'}}))}
 function fmtTime(sec){sec=Math.max(0,Math.round(Number(sec)||0));if(sec<60)return `${sec} s`;const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;if(h)return `${h} h ${String(m).padStart(2,'0')} min`;return `${m} min ${String(s).padStart(2,'0')} s`}
 function phase(label){if(/Conversion MP4/i.test(label))return'transcode';if(/Adaptation/i.test(label))return'remux';if(/Vérification|Démarrage/i.test(label))return'check';return'other'}
 function box(){
@@ -46,12 +46,62 @@ function progress(f,label,p){const k=key(f),old=active.get(k),ph=phase(label),ol
 function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{if(currentRun&&!currentRun.finished)paint()},1000)}
 function stopTicker(){clearInterval(ticker);ticker=0}
 function settings(){if($('videoConcurrency'))return;const s=$('settings');if(!s)return;const d=document.createElement('div');d.innerHTML='<hr><h3>🎬 Conversion vidéo UltraStar</h3><p class="muted">Nombre de vidéos incompatibles préparées en même temps. Le changement est appliqué immédiatement à la file en cours.</p><div class="controls wrap" style="justify-content:flex-start"><label for="videoConcurrency">Conversions simultanées</label><select id="videoConcurrency"><option value="1">1 · Économie</option><option value="2">2 · Recommandé</option><option value="3">3 · Rapide</option><option value="4">4 · Très rapide</option></select><span id="videoConcurrencyHint" class="status"></span></div>';s.appendChild(d);const sel=$('videoConcurrency'),hint=$('videoConcurrencyHint'),sync=()=>{sel.value=String(concurrency());hint.textContent=`${concurrency()} à la fois`};sel.onchange=()=>{setConcurrency(sel.value);sync();if(currentRun&&!currentRun.paused)currentRun.pump();paint(`Limite modifiée : ${concurrency()} conversion${concurrency()>1?'s':''} simultanée${concurrency()>1?'s':''}`)};sync()}
-function playable(blob,ms=3500){return new Promise(r=>{const v=document.createElement('video'),u=URL.createObjectURL(blob);let x=0;const end=ok=>{if(x)return;x=1;clearTimeout(t);v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(u);r(ok)},t=setTimeout(()=>end(v.readyState>=1),ms);v.preload='metadata';v.muted=true;v.onloadedmetadata=()=>end(true);v.oncanplay=()=>end(true);v.onerror=()=>end(false);v.src=u;v.load()})}
-function cancelWorker(k){const task=workerTasks.get(k);if(task)task.cancel()}
+function playable(blob,ms=3500){return new Promise(r=>{const v=document.createElement('video'),u=URL.createObjectURL(blob);let x=0;const end=ok=>{if(x)return;x=1;clearTimeout(t);v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(u);r(ok)},hasVideo=()=>v.videoWidth>0&&v.videoHeight>0,t=setTimeout(()=>end(hasVideo()),ms);v.preload='metadata';v.muted=true;v.onloadedmetadata=()=>end(hasVideo());v.oncanplay=()=>end(hasVideo());v.onerror=()=>end(false);v.src=u;v.load()})}
 function cancelAllWorkers(){for(const task of [...workerTasks.values()])task.cancel()}
-async function convert(f,mode,cb,run){const w=new Worker(WORKER),job='pre-'+Date.now()+'-'+Math.random(),buf=await f.arrayBuffer(),k=key(f);return new Promise(r=>{let x=0;const end=(v,cancelled=false)=>{if(x)return;x=1;workerTasks.delete(k);try{w.terminate()}catch(e){}r(cancelled?{cancelled:true}:v)};workerTasks.set(k,{worker:w,cancel:()=>end(null,true)});w.onmessage=e=>{const d=e.data||{};if(d.job!==job)return;if(d.type==='progress')cb(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));else if(d.type==='done')end(new Blob([d.buffer],{type:'video/mp4'}));else if(d.type==='error')end(null)};w.onerror=()=>end(null);if(run.paused||run.finished)return end(null,true);w.postMessage({type:'convert',job,name:f.name,mode,buffer:buf},[buf])})}
-async function videos(list){const fs=[...list],txt=fs.filter(f=>/\.txt$/i.test(f.name)),out=[];for(const tf of txt)try{const meta={},text=await tf.text();for(const l of text.split(/\r?\n/))if(l[0]==='#'&&l.includes(':')){const i=l.indexOf(':');meta[l.slice(1,i).toUpperCase()]=l.slice(i+1).trim()}const dir=(tf.webkitRelativePath||tf.name).split('/').slice(0,-1).join('/'),wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop(),same=f=>(f.webkitRelativePath||f.name).split('/').slice(0,-1).join('/')===dir,c=(wanted&&fs.find(f=>same(f)&&f.name.toLowerCase()===wanted.toLowerCase()))||fs.find(f=>same(f)&&RX.test(f.name));if(c)out.push(c)}catch(e){}const m=new Map;out.forEach(f=>m.set(key(f),f));return[...m.values()]}
-async function one(f,run){if(run.token!==token||run.finished)return{status:'cancel'};if(run.paused)return{status:'paused'};progress(f,'Vérification…',4);if(await cached(f)){progress(f,'Déjà en cache',100);return{status:'cached'}}if(run.paused)return{status:'paused'};if(await playable(f)){progress(f,'Compatible directement',100);return{status:'native'}}if(run.paused)return{status:'paused'};let b=await convert(f,'remux',p=>progress(f,'Adaptation rapide…',p),run);if(b?.cancelled)return{status:'paused'};if(b&&await playable(b)){await cache(f,b);progress(f,'Adaptée ✓',100);return{status:'converted'}}if(run.paused||run.token!==token)return{status:'paused'};b=await convert(f,'transcode',p=>progress(f,'Conversion MP4 H.264/AAC…',p),run);if(b?.cancelled)return{status:'paused'};if(b&&await playable(b)){await cache(f,b);progress(f,'Convertie ✓',100);return{status:'converted'}}if(run.paused)return{status:'paused'};progress(f,'Échec automatique',100);return{status:'failed'}}
+async function convert(f,mode,cb,run){
+  const buf=await f.arrayBuffer();
+  if(run.paused||run.finished)return {cancelled:true};
+  const w=new Worker(WORKER),job='pre-'+Date.now()+'-'+Math.random(),k=key(f);
+  return new Promise(resolve=>{
+    let ended=false;
+    const end=result=>{
+      if(ended)return;
+      ended=true;
+      workerTasks.delete(k);
+      w.terminate();
+      resolve(result);
+    };
+    workerTasks.set(k,{cancel:()=>end({cancelled:true})});
+    w.onmessage=e=>{
+      const d=e.data||{};
+      if(d.job!==job)return;
+      if(d.type==='progress')cb(Math.round(Math.max(0,Math.min(1,d.progress||0))*100));
+      else if(d.type==='done')end({blob:new Blob([d.buffer],{type:'video/mp4'})});
+      else if(d.type==='error')end({reason:d.message||'Erreur FFmpeg'});
+    };
+    w.onerror=e=>end({reason:e.message||'Le moteur vidéo n’a pas pu démarrer'});
+    w.onmessageerror=()=>end({reason:'Réponse illisible du moteur vidéo'});
+    try{w.postMessage({type:'convert',job,name:f.name,mode,buffer:buf},[buf])}
+    catch(error){end({reason:errorMessage(error)})}
+  });
+}
+async function one(f,run){
+  if(run.finished||run.paused)return {status:'paused'};
+  progress(f,'Vérification…',4);
+  const alreadyCached=await cached(f);
+  if(run.finished||run.paused)return {status:'paused'};
+  if(alreadyCached)return {status:'cached'};
+  const native=await playable(f);
+  if(run.finished||run.paused)return {status:'paused'};
+  if(native)return {status:'native'};
+
+  const attempts=[['remux','Adaptation rapide'],['transcode','Conversion MP4 H.264/AAC']];
+  const reasons=[];
+  for(const [mode,label] of attempts){
+    progress(f,label+'…',0);
+    const result=await convert(f,mode,p=>progress(f,label+'…',p),run);
+    if(result.cancelled||run.finished||run.paused)return {status:'paused'};
+    const readable=result.blob&&await playable(result.blob);
+    if(run.finished||run.paused)return {status:'paused'};
+    if(readable){
+      try{await cache(f,result.blob)}
+      catch(error){return {status:'failed',reason:'Enregistrement en cache impossible · '+errorMessage(error)}}
+      return {status:'converted'};
+    }
+    reasons.push(label+' · '+(result.reason||'résultat illisible par le navigateur'));
+  }
+  return {status:'failed',reason:reasons.join(' / ')};
+}
 function settleEntry(e,result){if(e.settled)return;e.settled=true;e.resolve(result);jobs.delete(key(e.f))}
 function abortRun(run){if(!run||run.finished)return;run.finished=true;run.paused=false;cancelAllWorkers();for(const e of run.entries)if(!e.settled)settleEntry(e,{status:'cancel'});run.queue.length=0;active.clear();run.running=0;run.finishResolve?.();if(currentRun===run)currentRun=null;stopTicker()}
 function pauseRun(reason='user'){
@@ -59,15 +109,27 @@ function pauseRun(reason='user'){
 }
 function resumeRun(auto=false){const run=currentRun;if(!run||run.finished||!run.paused)return;if(run.pauseReason==='user'&&auto)return;run.paused=false;run.pauseReason='';paint('▶ Reprise des conversions…');run.pump();startTicker()}
 function bindControlButtons(){const stop=$('ultraStarStopConversions'),resume=$('ultraStarResumeConversions');if(stop&&!stop.dataset.bound){stop.dataset.bound='1';stop.onclick=()=>pauseRun('user')}if(resume&&!resume.dataset.bound){resume.dataset.bound='1';resume.onclick=()=>resumeRun(false)}}
-async function start(list){
-  if(currentRun)abortRun(currentRun);const t=++token,fs=await videos(list);if(t!==token)return;total=fs.length;done=0;active.clear();
+function start(list){
+  if(currentRun)abortRun(currentRun);const fs=[...new Map(list.map(f=>[key(f),f])).values()];total=fs.length;done=0;active.clear();
   if(!total){currentRun=null;paint('Aucune vidéo UltraStar à préparer.');return}
+  const failures=[];
   const stats={native:0,cached:0,converted:0,failed:0},entries=fs.map(f=>{let resolve;const promise=new Promise(r=>resolve=r),e={f,resolve,promise,settled:false,queued:false,startedAt:0};jobs.set(key(f),promise);return e});let finishResolve;const finished=new Promise(r=>finishResolve=r);
-  const run={token:t,entries,queue:[...entries],running:0,finished:false,paused:false,pauseReason:'',history:[],finishResolve,pump:null};currentRun=run;
-  const finishIfDone=()=>{if(run.finished||t!==token)return;if(done>=total&&run.running===0&&run.queue.length===0){run.finished=true;active.clear();stopTicker();paint(`Terminé · ${stats.native} compatible${stats.native>1?'s':''} · ${stats.converted} préparée${stats.converted>1?'s':''} · ${stats.cached} en cache${stats.failed?` · ${stats.failed} échec${stats.failed>1?'s':''}`:''}`);finishResolve()}};
-  const launch=e=>{run.running++;e.queued=false;e.startedAt=Date.now();progress(e.f,'Démarrage…',1);(async()=>{let r;try{r=await one(e.f,run)}catch(err){console.error(err);r={status:run.paused?'paused':'failed'}}const elapsed=(Date.now()-e.startedAt)/1000;active.delete(key(e.f));run.running--;if(r?.status==='paused'&&!run.finished){if(!e.settled&&!e.queued){e.queued=true;run.queue.unshift(e)}}else if(r?.status==='cancel'){settleEntry(e,r)}else{if(stats[r?.status]!==undefined)stats[r.status]++;if(r?.status==='converted'&&elapsed>2)run.history.push(elapsed);done++;settleEntry(e,r)}paint(`Préparation en cours · ${done}/${total} terminée${done>1?'s':''}`);run.pump();finishIfDone()})()};
-  run.pump=()=>{if(t!==token||run.finished||run.paused)return;const wanted=concurrency();while(run.running<wanted&&run.queue.length){const e=run.queue.shift();if(e.settled)continue;launch(e)}paint()};
-  paint(`Analyse de ${total} vidéo${total>1?'s':''} · jusqu’à ${concurrency()} en parallèle`);startTicker();run.pump();finishIfDone();await finished
+  const run={entries,queue:[...entries],running:0,finished:false,paused:false,pauseReason:'',history:[],finishResolve,pump:null};currentRun=run;
+  const finishIfDone=()=>{if(run.finished)return;if(done>=total&&run.running===0&&run.queue.length===0){run.finished=true;active.clear();stopTicker();paint(`Terminé · ${stats.native} compatible${stats.native>1?'s':''} · ${stats.converted} préparée${stats.converted>1?'s':''} · ${stats.cached} en cache${stats.failed?` · ${stats.failed} échec${stats.failed>1?'s':''}`:''}`);if(failures.length){
+      const details=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');
+      summary.textContent='Voir les échecs vidéo';
+      for(const [name,reason] of failures){
+        const item=document.createElement('li');
+        item.textContent=name+' · '+reason;
+        list.appendChild(item);
+      }
+      details.append(summary,list);
+      $('ultraStarPreconvertText')?.appendChild(details);
+    }
+    finishResolve()}};
+  const launch=e=>{run.running++;e.queued=false;e.startedAt=Date.now();progress(e.f,'Démarrage…',1);(async()=>{let r;try{r=await one(e.f,run)}catch(err){console.error(err);r={status:run.paused?'paused':'failed',reason:errorMessage(err)}}if(run.finished)return;const elapsed=(Date.now()-e.startedAt)/1000;active.delete(key(e.f));run.running--;if(r?.status==='paused'&&!run.finished){if(!e.settled&&!e.queued){e.queued=true;run.queue.unshift(e)}}else if(r?.status==='cancel'){settleEntry(e,r)}else{if(stats[r?.status]!==undefined)stats[r.status]++;if(r?.status==='failed')failures.push([e.f.webkitRelativePath||e.f.name,r.reason]);if(r?.status==='converted'&&elapsed>2)run.history.push(elapsed);done++;settleEntry(e,r)}paint(`Préparation en cours · ${done}/${total} terminée${done>1?'s':''}`);run.pump();finishIfDone()})()};
+  run.pump=()=>{if(run.finished||run.paused)return;const wanted=concurrency();while(run.running<wanted&&run.queue.length){const e=run.queue.shift();if(e.settled)continue;launch(e)}paint()};
+  paint(`Analyse de ${total} vidéo${total>1?'s':''} · jusqu’à ${concurrency()} en parallèle`);startTicker();run.pump();finishIfDone();return finished
 }
 
 /* Dossier UltraStar mémorisé */
@@ -85,12 +147,11 @@ async function permission(h,request=false){if(!h)return'denied';try{if(await h.q
 function pathFile(file,path){try{Object.defineProperty(file,'webkitRelativePath',{value:path,configurable:true});return file}catch(e){const f=new File([file],file.name,{type:file.type,lastModified:file.lastModified});try{Object.defineProperty(f,'webkitRelativePath',{value:path,configurable:true})}catch(_){}return f}}
 async function readDirectory(root){const out=[];async function walk(dir,rel){const tasks=[];for await(const [name,h] of dir.entries()){const p=rel?`${rel}/${name}`:name;if(h.kind==='directory')tasks.push(walk(h,p));else tasks.push(h.getFile().then(f=>out.push(pathFile(f,`${root.name}/${p}`))))}await Promise.all(tasks)}await walk(root,'');return out}
 async function waitApp(){const started=Date.now();while(Date.now()-started<6000){try{if(typeof tracks!=='undefined'&&Array.isArray(tracks)&&tracks.length>=8&&typeof importUltraStarFolder==='function')return true}catch(e){}await new Promise(r=>setTimeout(r,100))}return typeof importUltraStarFolder==='function'}
-async function enrichTracks(files){const txts=files.filter(f=>/\.txt$/i.test(f.name));for(const tf of txts)try{const meta={},text=await tf.text();for(const l of text.split(/\r?\n/))if(l[0]==='#'&&l.includes(':')){const i=l.indexOf(':');meta[l.slice(1,i).toUpperCase()]=l.slice(i+1).trim()}const artist=meta.ARTIST||'Artiste inconnu',title=meta.TITLE||tf.name.replace(/\.txt$/i,''),dir=tf.webkitRelativePath.split('/').slice(0,-1).join('/'),wanted=String(meta.VIDEO||'').replace(/\\/g,'/').split('/').pop(),same=f=>f.webkitRelativePath.split('/').slice(0,-1).join('/')===dir,c=(wanted&&files.find(f=>same(f)&&f.name.toLowerCase()===wanted.toLowerCase()))||files.find(f=>same(f)&&RX.test(f.name));if(!c)continue;const tr=tracks.find(t=>t.kind==='ultrastar'&&norm(`${t.artist}|${t.title}`)===norm(`${artist}|${title}`));if(tr){tr.videoBlob=c;tr.compatVideoBlob=c;tr.videoName=c.name}}catch(e){console.warn('KaraokeWorld association vidéo mémorisée',e)}}
 async function scanRemembered({request=false,automatic=false}={}){
   if(folderScanBusy||!rememberedHandle)return;const p=await permission(rememberedHandle,request);const grant=$('ultraStarGrantFolder');if(grant)grant.classList.toggle('hidden',p==='granted');
   if(p!=='granted'){folderStatus(`Dossier mémorisé : ${rememberedHandle.name}. Clique sur « Autoriser l’accès » pour le recharger.`,rememberedHandle.name);return}
   folderScanBusy=true;folderStatus(`Lecture de « ${rememberedHandle.name} »…`,rememberedHandle.name);
-  try{await waitApp();const files=await readDirectory(rememberedHandle);folderStatus(`${files.length} fichiers détectés · import UltraStar en cours…`,rememberedHandle.name);await importUltraStarFolder(files);await enrichTracks(files);folderStatus(`✅ ${rememberedHandle.name} chargé automatiquement${automatic?' après la mise à jour':''}.`,rememberedHandle.name);start(files)}catch(e){console.error(e);folderStatus(`Impossible de relire le dossier : ${e.message||e}`,rememberedHandle.name)}finally{folderScanBusy=false}
+  try{await waitApp();const files=await readDirectory(rememberedHandle);folderStatus(`${files.length} fichiers détectés · import UltraStar en cours…`,rememberedHandle.name);await importUltraStarFolder(files);folderStatus(`✅ ${rememberedHandle.name} chargé automatiquement${automatic?' après la mise à jour':''}.`,rememberedHandle.name)}catch(e){console.error(e);folderStatus(`Impossible de relire le dossier : ${e.message||e}`,rememberedHandle.name)}finally{folderScanBusy=false}
 }
 function bindFolderButtons(){
   const connect=$('ultraStarConnectFolder'),grant=$('ultraStarGrantFolder'),refresh=$('ultraStarRefreshFolder'),forget=$('ultraStarForgetFolder');
@@ -111,7 +172,6 @@ document.addEventListener('resume',()=>{if(currentRun?.pauseReason==='lifecycle'
 window.addEventListener('pageshow',()=>{if(currentRun?.pauseReason==='lifecycle')resumeRun(true)});
 
 settings();folderUI();box();document.addEventListener('DOMContentLoaded',()=>{settings();folderUI();box();restoreFolder()},{once:true});if(document.readyState!=='loading')restoreFolder();
-const input=$('ultraStarFolder');if(input)input.addEventListener('change',e=>start(e.target.files));
 const small=document.querySelector('.brand small');if(small)small.textContent=' BETA · v0.26.5 · UltraStar 🎤';
-window.KaraokeWorldVideoPreconvert={version:'0.26.5',getConcurrency:concurrency,setConcurrency:n=>{setConcurrency(n);if(currentRun&&!currentRun.paused)currentRun.pump();paint()},stopAll:()=>pauseRun('user'),resumeAll:()=>resumeRun(false),refreshRememberedFolder:()=>scanRemembered({request:true}),waitForFile:f=>jobs.get(key(f))||Promise.resolve(),isPreparing:f=>jobs.has(key(f))};
+window.KaraokeWorldVideoPreconvert={version:'0.26.5',start,getConcurrency:concurrency,setConcurrency:n=>{setConcurrency(n);if(currentRun&&!currentRun.paused)currentRun.pump();paint()},stopAll:()=>pauseRun('user'),resumeAll:()=>resumeRun(false),refreshRememberedFolder:()=>scanRemembered({request:true}),waitForFile:f=>jobs.get(key(f))||Promise.resolve(),isPreparing:f=>jobs.has(key(f))};
 })();
