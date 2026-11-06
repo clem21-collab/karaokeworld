@@ -3,6 +3,7 @@ const CORE_JS = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmp
 const CORE_WASM = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm';
 let corePromise = null;
 let currentJob = '';
+let lastError = '';
 
 async function getCore(){
   if(corePromise) return corePromise;
@@ -11,6 +12,9 @@ async function getCore(){
     if(typeof createFFmpegCore !== 'function') throw new Error('FFmpeg core indisponible');
     const cfg = btoa(JSON.stringify({wasmURL:CORE_WASM, workerURL:''}));
     const core = await createFFmpegCore({mainScriptUrlOrBlob:`${CORE_JS}#${cfg}`});
+    core.setLogger(({type,message})=>{
+      if(type==='stderr'&&message.trim()) lastError=message.trim();
+    });
     core.setProgress(({progress,time})=>{
       self.postMessage({type:'progress',job:currentJob,progress:Number(progress)||0,time:Number(time)||0});
     });
@@ -28,9 +32,12 @@ self.onmessage = async ev => {
   const {type,job,name,buffer,mode} = ev.data || {};
   if(type !== 'convert' || !buffer) return;
   currentJob = job || '';
+  lastError = '';
   let input='', output='output.mp4';
   try{
-    const core = await getCore();
+    const core = await getCore().catch(err=>{
+      throw new Error('Chargement de FFmpeg impossible · '+(err?.message||err));
+    });
     input = safeName(name);
     try{ core.FS.unlink(input); }catch(e){}
     try{ core.FS.unlink(output); }catch(e){}
@@ -38,7 +45,7 @@ self.onmessage = async ev => {
 
     let args;
     if(mode === 'remux'){
-      args=['-i',input,'-map','0:v:0?','-map','0:a:0?','-c','copy','-movflags','+faststart',output];
+      args=['-i',input,'-map','0:v:0','-map','0:a:0?','-c','copy','-movflags','+faststart',output];
     }else{
       args=[
         '-i',input,
@@ -50,7 +57,8 @@ self.onmessage = async ev => {
       ];
     }
     const code = core.exec(...args);
-    if(code !== 0) throw new Error(`FFmpeg a retourné le code ${code}`);
+    core.reset();
+    if(code !== 0) throw new Error(`FFmpeg a retourné le code ${code}${lastError?` · ${lastError}`:''}`);
     const out = core.FS.readFile(output);
     const copy = out.slice().buffer;
     try{ core.FS.unlink(input); }catch(e){}
