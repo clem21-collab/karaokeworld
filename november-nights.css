@@ -1,0 +1,350 @@
+/* Toutes les règles sont isolées. Aucune ne s'applique à l'iframe des 60 ans. */
+html.november-nights {
+  color-scheme: dark;
+  --bg: #0f1118;
+  --panel: #1b1820;
+  --line: #6d4a33;
+  --text: #f5eee5;
+  --muted: #c0b4a8;
+  --blue: #b86b3d;
+  --purple: #b86b3d;
+  --cyan: #e5b36a;
+  --nn-gold: #e5b36a;
+  --nn-copper: #b86b3d;
+  --nn-edge: #614632;
+}
+html.november-nights body {
+  background: radial-gradient(ellipse at 85% 4%, #6d4a331c, transparent 48rem), #0f1118 !important;
+  color: var(--text);
+}
+html.november-nights :is(body, main, .home-hero, .stage-bg, .stage-lyrics-wrap)::before,
+html.november-nights :is(body, main, .home-hero, .stage-bg, .stage-lyrics-wrap)::after {
+  content: none !important;
+  animation: none !important;
+}
+html.november-nights header {
+  background: #12131b;
+  border-bottom-color: #b86b3d40;
+  box-shadow: 0 6px 24px #0002;
+}
+html.november-nights .brand { font-size: 23px; text-shadow: none; }
+html.november-nights .brand::before { content: none; }
+html.november-nights .brand span {
+  background: none;
+  color: var(--nn-gold);
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+}
+html.november-nights .brand small { color: var(--muted); font-weight: 500; }
+html.november-nights .brand #kwCurrentVersion { color: var(--muted); }
+html.november-nights aside {
+  background: linear-gradient(180deg, #14151d, #101219);
+  border-color: #b86b3d2e;
+  box-shadow: none;
+}
+html.november-nights .nav {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  box-shadow: none;
+  padding: 12px;
+}
+html.november-nights .nav.active,
+html.november-nights .nav:hover {
+  color: #f5eee5;
+  background: linear-gradient(100deg, #b86b3d26, #b86b3d0a);
+  border-color: #b86b3d65;
+  box-shadow: inset 3px 0 #b86b3d;
+}
+html.november-nights .side-info { background: #1b182060; border-color: #b86b3d38; }
+html.november-nights button {
+  background: linear-gradient(115deg, #e5b36a, #c38951);
+  color: #21160d;
+  border-color: #e5b36a99;
+  box-shadow: none;
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+html.november-nights button.secondary {
+  background: #211d25;
+  color: #f5eee5;
+  border-color: #805939;
+  box-shadow: none;
+}
+html.november-nights button.danger { background: #41252a; color: #ffd9cf; border-color: #8a4b4c; }
+html.november-nights button:hover:not(:disabled) { box-shadow: 0 3px 16px #e5b36a20; }
+html.november-nights .top-actions button { box-shadow: none; border-color: #b86b3d88; }
+html.november-nights :is(input, select) { background: #13151e; color: var(--text); border-color: #78573e; }
+html.november-nights :is(input, select)::placeholder { color: #b1a69a; opacity: 1; }
+html.november-nights input { accent-color: var(--nn-gold); }
+html.november-nights :is(button, a, input, select, summary):focus-visible {
+  outline: 2px solid var(--nn-gold);
+  outline-offset: 4px;
+}
+html.november-nights .eyebrow { color: var(--nn-gold); text-shadow: none; }
+html.november-nights .home-hero {
+  padding: 40px 40px 30px;
+  min-height: 0;
+  text-align: left;
+  border-radius: 22px;
+  border-color: #b86b3d88;
+  background: radial-gradient(ellipse at 75% 20%, #b86b3d16, transparent 62%), linear-gradient(125deg, #1d2433, #1b1820 70%, #241d24);
+  box-shadow: inset 0 1px #e5b36a10, 0 18px 48px #0003;
+}
+html.november-nights .home-glow { display: none; }
+html.november-nights .home-hero > .eyebrow { font-size: 10px; letter-spacing: .24em; margin-bottom: 20px; }
+html.november-nights .home-hero h1 {
+  margin: 0 0 14px;
+  font-weight: 400;
+  text-shadow: none;
+  letter-spacing: -.035em;
+  max-width: 65%;
+}
+html.november-nights .home-hero h1 span {
+  background: none;
+  color: inherit;
+  filter: none;
+  -webkit-text-fill-color: currentColor;
+}
+html.november-nights .home-hero .nn-brand {
+  display: block;
+  font: 600 14px/1.5 system-ui, sans-serif;
+  letter-spacing: .035em;
+  color: #ded1c3;
+  margin-bottom: 9px;
+}
+html.november-nights .home-hero .nn-title {
+  display: block;
+  color: #f1d0a1;
+  font: 400 clamp(58px, 6.2vw, 88px)/.98 Georgia, 'Times New Roman', serif;
+  letter-spacing: -.045em;
+}
+html.november-nights .home-hero .nn-title-leaf { display: inline-block; font-size: .4em; vertical-align: .15em; }
+html.november-nights .home-hero > p {
+  max-width: 63%;
+  font-size: 15px;
+  color: #d0c2b5;
+  line-height: 1.6;
+  margin: 20px 0 30px;
+}
+html.november-nights .home-search {
+  max-width: none;
+  position: relative;
+  background: #10131ceb;
+  border-color: #a87648;
+  border-radius: 13px;
+  box-shadow: 0 8px 28px #0003;
+  margin: 0;
+}
+html.november-nights .home-search:focus-within { border-color: #e5b36a; box-shadow: 0 0 0 3px #e5b36a1f; }
+html.november-nights .home-search > span { color: #e5b36a; }
+html.november-nights .home-search input { background: transparent; font-size: 15px; }
+html.november-nights .home-search button,
+html.november-nights .hero-actions button:first-child { background: linear-gradient(115deg, #e5b36a, #c38951); color: #21160d; box-shadow: none; }
+html.november-nights .hero-actions { justify-content: flex-start; margin-top: 13px; }
+html.november-nights .hero-actions button { border-color: #a8754c; font-size: 12px; padding: 10px 15px; }
+html.november-nights .home-hero > .nn-scenery {
+  position: absolute;
+  top: 25px;
+  right: 36px;
+  width: 34%;
+  height: 290px;
+  pointer-events: none;
+  z-index: -1;
+}
+html.november-nights .nn-window {
+  position: absolute;
+  inset: 0 18% 24px 4%;
+  border: 1px solid #e5b36a52;
+  border-radius: 160px 160px 6px 6px;
+  overflow: hidden;
+  background: radial-gradient(circle at 60% 38%, #b86b3d24, transparent 60%), linear-gradient(145deg, #283144, #12161f);
+  box-shadow: 10px 10px 0 -1px #1c1d28, 10px 10px 0 0 #e5b36a17;
+}
+html.november-nights .nn-moon {
+  position: absolute;
+  top: 42px;
+  left: 28%;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #f1d0a1, #b86b3d);
+  box-shadow: 0 0 36px #e5b36a16;
+}
+html.november-nights .nn-horizon {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  bottom: -95px;
+  height: 200px;
+  border-radius: 50%;
+  background: #0f1118;
+  border: 1px solid #b86b3d38;
+  transform: rotate(-12deg);
+}
+html.november-nights .nn-orbit {
+  position: absolute;
+  width: 145px;
+  height: 145px;
+  bottom: -12px;
+  right: -35px;
+  border: 1px solid #e5b36a33;
+  border-radius: 50%;
+  box-shadow: 0 0 0 13px #e5b36a07, 0 0 0 26px #e5b36a06, 0 0 0 39px #e5b36a04;
+}
+html.november-nights .nn-music { position: absolute; bottom: 24px; left: 24px; color: #e5b36a9e; font: 70px/1 Georgia, serif; transform: rotate(-16deg); }
+html.november-nights .nn-star { position: absolute; right: 22px; top: 52px; color: #e5b36a; font-size: 15px; }
+html.november-nights .nn-caption { position: absolute; bottom: 0; left: 4%; font-size: 7px; letter-spacing: .13em; color: #c9aa84; }
+html.november-nights .nn-leaf {
+  position: absolute;
+  display: block;
+  width: 16px;
+  height: 30px;
+  border-radius: 2px 100% 2px 100%;
+  background: linear-gradient(48deg, #9e603a 48%, #e5b36a99 49%, #e5b36a99 52%, #b86b3d 53%);
+  opacity: .55;
+  animation: nn-leaf-drift 10s ease-in-out infinite alternate;
+}
+html.november-nights .leaf-one { top: 12px; right: 8px; --leaf-angle: 28deg; }
+html.november-nights .leaf-two { top: 130px; right: 1%; --leaf-angle: 110deg; animation-delay: -4s; width: 12px; height: 24px; }
+html.november-nights .leaf-three { top: 180px; left: -20px; --leaf-angle: -35deg; animation-delay: -7s; }
+html.november-nights .leaf-four { top: 90px; left: -15%; --leaf-angle: 40deg; animation-delay: -2s; width: 10px; height: 20px; opacity: .25; }
+@keyframes nn-leaf-drift {
+  from { transform: translateY(0) rotate(var(--leaf-angle)); }
+  to { transform: translateY(20px) rotate(calc(var(--leaf-angle) + 22deg)); }
+}
+html.november-nights .home-section h2,
+html.november-nights .row-head h2 { color: #f5eee5; text-shadow: none; }
+html.november-nights :is(.panel, .track, .home-card, #kwPublicCatalog) {
+  background: linear-gradient(145deg, #1b1c27, #1b1820);
+  border-color: var(--nn-edge);
+  box-shadow: 0 7px 20px #0002;
+}
+html.november-nights :is(.track, .home-card, .kw-public-card) {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+html.november-nights .home-card { min-height: 142px; border-radius: 14px; }
+html.november-nights .home-card .home-emoji { filter: none; opacity: .85; }
+html.november-nights :is(.home-card, .track, .kw-public-card):hover {
+  border-color: #b8834c;
+  box-shadow: 0 8px 24px #0003, 0 0 18px #e5b36a0f;
+  transform: translateY(-2px);
+}
+html.november-nights .cover { background: linear-gradient(135deg, #394052, #6d4a33); box-shadow: inset 0 0 0 1px #e5b36a22; }
+html.november-nights .cover img { object-fit: cover; }
+html.november-nights .track .favorite { color: #c0b4a8; box-shadow: none; }
+html.november-nights .track .favorite.on { color: #e5b36a; filter: none; }
+html.november-nights .library-section { border-top-color: #b86b3d38; }
+html.november-nights :is(.library-tools, .playlist-tools, .lyric-result, .youtube-result, .audio-card, .cloud-card, .empty-state) { background: #181820; border-color: #765339; }
+html.november-nights .filter { background: #1b1820; border-color: #735139; color: #d7c8b9; }
+html.november-nights .filter.active,
+html.november-nights .mode-button.active { background: #6d4a33; color: #fff3dd; border-color: #e5b36a; }
+html.november-nights .status { background: #31271f; color: #ead0a7; }
+html.november-nights .queue-item { border-bottom-color: #6d4a335e; }
+html.november-nights .mini { background: #39303a; }
+html.november-nights .ready-card { background: linear-gradient(135deg, #1d2b2b, #1b1820); }
+html.november-nights .audio-card > label:not(.monitor-toggle),
+html.november-nights .monitor-toggle { color: #d9cfc4; }
+html.november-nights .audio-status span { background: #262833; color: #e1d5c5; }
+html.november-nights :is(.seek input, .stage-progress input, .audio-range, .check-label input) { accent-color: #e5b36a; }
+html.november-nights .meter { background: #252631; }
+html.november-nights .meter span { background: linear-gradient(90deg, #719a83, #e5b36a); }
+html.november-nights :is(.yt-open, .manual-youtube summary) { color: #e5b36a; }
+html.november-nights .button-link { background: #e5b36a; color: #21160d; }
+html.november-nights #kwPublicCatalog .kw-public-card { border-color: #6d4a33; background: #161821; }
+html.november-nights #kwPublicCatalog .kw-public-icon { background: linear-gradient(140deg, #354056, #33251e); }
+html.november-nights #kwPublicCatalog .secondary { background: #28222a !important; }
+html.november-nights #kwPublicCatalog .kw-public-badge { background: #27382b; color: #b7dfb2; border-color: #6e9c6a66; }
+html.november-nights :is(#ultraStarFolderMemory, #ultraStarPreconvert, #cloudUltraStarBox, #kwLibraryUpdateSimple) { background: #191b24 !important; border-color: #6d4a33 !important; }
+html.november-nights .lyrics { background: radial-gradient(ellipse at 50% 10%, #6d4a3325, transparent 70%); }
+html.november-nights .highlight { color: #f1d0a1; text-shadow: 0 0 14px #e5b36a24; }
+html.november-nights .artist { color: #c0b4a8; }
+html.november-nights #karaokeStage {
+  background: #0f1118;
+  grid-template-rows: minmax(0, 1fr);
+  transition: none;
+}
+html.november-nights #karaokeStage::after { background: linear-gradient(90deg, #0f1118b3, #0f1118d9); }
+html.november-nights #karaokeStage .stage-lyrics-wrap,
+html.november-nights #karaokeStage.layout-100 .stage-lyrics-wrap {
+  background: radial-gradient(ellipse at 50% 40%, #6d4a332a, transparent 65%), #0f1118 !important;
+  height: 100% !important;
+  min-height: 0;
+  align-self: start;
+  grid-row: 1;
+}
+html.november-nights .stage-video { background: #16171f; border-color: #6d4a33; }
+html.november-nights :is(.stage-song-info span, .stage-option, .stage-progress, .stage-mic) { color: #c0b4a8; }
+html.november-nights .stage-hint { color: #a99b8c; }
+html.november-nights .stage-line { color: #b3a89d; text-shadow: none; }
+html.november-nights .stage-line.active {
+  background: linear-gradient(90deg, #e5b36a var(--sing-progress,0%), #fff8ee var(--sing-progress,0%));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent !important;
+  text-shadow: none !important;
+  filter: none;
+}
+html.november-nights .stage-line.next { color: #e8ddd0; }
+html.november-nights .stage-line.instrumental { color: #d7b184; }
+html.november-nights .us-syl,
+html.november-nights .us-line.current .us-syl { color: #d5c8ba !important; }
+html.november-nights .us-line.current .us-syl.done,
+html.november-nights .us-line.current .us-syl.singing {
+  color: #e5b36a !important;
+  text-shadow: 0 0 12px #e5b36a30;
+  filter: none;
+}
+html.november-nights .us-line.next .us-syl { color: #e8ddd0 !important; }
+html.november-nights :is(.stage-layout.active, .stage-layout-fallback.active) { background: #e5b36a !important; color: #21160d !important; }
+html.november-nights #karaokeStage.layout-100 .stage-global-toolbar .active { background: #e5b36a !important; color: #21160d !important; }
+html.november-nights #karaokeStage .stage-global-toolbar { background: #171820ed !important; border-color: #b86b3d80 !important; }
+html.november-nights .stage-countdown { background: #0f1118a8; color: #f1d0a1; text-shadow: 0 0 35px #e5b36a33; backdrop-filter: none; }
+html.november-nights .update-toast { background: #1b1820fa !important; border-color: #b86b3d !important; }
+html.november-nights footer::after { content: ' · November Nights 🍂'; color: #e5b36a; }
+html.november-nights .nn-motion-setting { margin-top: 24px; padding-top: 20px; border-top: 1px solid #6d4a33; }
+html.november-nights .nn-motion-setting label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+html.november-paused .nn-leaf { animation-play-state: paused; }
+html.november-still .nn-leaf { animation: none; transform: rotate(var(--leaf-angle)); }
+html.november-still *, html.november-still *::before, html.november-still *::after { transition: none !important; scroll-behavior: auto !important; }
+@media (max-width: 1000px) {
+  html.november-nights .home-hero { padding: 32px 26px 26px; }
+  html.november-nights .home-hero > .nn-scenery { right: 12px; width: 31%; height: 270px; }
+  html.november-nights .nn-caption { display: none; }
+}
+@media (max-width: 700px) {
+  html.november-nights header { gap: 14px; }
+  html.november-nights .brand small { display: block; margin-top: 4px; font-size: 10px; }
+  html.november-nights .brand #kwCurrentVersion { display: block; margin: 5px 0 0 !important; font-size: 9px !important; }
+  html.november-nights aside { gap: 4px; padding: 9px; }
+  html.november-nights .nav { padding: 9px; font-size: 12px; }
+  html.november-nights .home-hero { padding: 28px 22px 24px; }
+  html.november-nights .home-hero .nn-title { font-size: 66px; }
+  html.november-nights .home-hero > .nn-scenery { right: -15px; top: 44px; width: 28%; height: 230px; opacity: .65; }
+  html.november-nights .nn-moon { left: 15%; width: 42px; height: 42px; }
+  html.november-nights .nn-music { font-size: 50px; left: 10px; }
+  html.november-nights .nn-star, html.november-nights .leaf-four { display: none; }
+  html.november-nights .home-hero h1, html.november-nights .home-hero > p { max-width: 87%; }
+  html.november-nights .home-search { grid-template-columns: auto minmax(0,1fr); }
+  html.november-nights .home-search button { grid-column: 1/-1; }
+  html.november-nights .home-search input { font-size: 14px; }
+  html.november-nights .hero-actions { gap: 7px; }
+  html.november-nights .hero-actions button { flex: 1 1 auto; padding: 10px 9px; }
+  html.november-nights .status { white-space: normal; }
+}
+@media (max-width: 400px) {
+  html.november-nights .home-hero { padding: 25px 17px 20px; }
+  html.november-nights .home-hero .nn-title { font-size: 57px; }
+  html.november-nights .home-hero > .eyebrow { letter-spacing: .14em; font-size: 9px; }
+  html.november-nights .top-actions { flex-wrap: wrap; }
+}
+@media (hover: none) {
+  html.november-nights :is(.home-card, .track, .kw-public-card):hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.november-nights *, html.november-nights *::before, html.november-nights *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  html.november-nights .nn-leaf { transform: rotate(var(--leaf-angle)); }
+}
