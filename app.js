@@ -131,7 +131,7 @@ window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installProm
 function youtubeVideoId(value){try{const u=new URL(value.trim());if(u.hostname==="youtu.be")return u.pathname.split("/").filter(Boolean)[0]||"";if(u.hostname.endsWith("youtube.com")||u.hostname.endsWith("youtube-nocookie.com")){if(u.pathname==="/watch")return u.searchParams.get("v")||"";const m=u.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/);return m?m[1]:""}}catch(e){}return ""}
 function parseLrc(text){const parsed=[];for(const line of (text||"").split(/\r?\n/)){const m=line.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\](.*)$/);if(m)parsed.push({time:Number(m[1])*60+Number(m[2]),text:m[3].trim()})}return parsed}
 function ensureYouTubeApi(){return new Promise((resolve,reject)=>{if(window.YT&&YT.Player)return resolve();const old=window.onYouTubeIframeAPIReady;window.onYouTubeIframeAPIReady=()=>{if(typeof old==="function")old();resolve()};if(!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')){const sc=document.createElement("script");sc.src="https://www.youtube.com/iframe_api";sc.onerror=()=>reject(new Error("Impossible de charger le lecteur YouTube."));document.head.appendChild(sc)}})}
-function startYoutubeSync(){clearInterval(ytTimer);ytTimer=setInterval(()=>{try{if(!ytPlayer||typeof ytPlayer.getCurrentTime!=="function")return;const sec=ytPlayer.getCurrentTime()||0,dur=ytPlayer.getDuration()||0;$('elapsed').textContent=fmt(sec);$('duration').textContent=fmt(dur);if(dur)$('seek').value=sec/dur*100;if($('stageElapsed'))$('stageElapsed').textContent=fmt(sec);if($('stageDuration'))$('stageDuration').textContent=fmt(dur);if(dur&&$('stageSeek'))$('stageSeek').value=sec/dur*100;{const lyricSecond=Math.max(0,mapVideoToLyricTime(sec));if(String(ultraStarCurrentId||'').startsWith('ultrastar_youtube_'))renderUltraStarStage(lyricSecond);else renderLyrics(lyricSecond)} }catch(e){}},200)}
+function startYoutubeSync(){clearInterval(ytTimer);ytTimer=setInterval(()=>{try{if(!ytPlayer||typeof ytPlayer.getCurrentTime!=="function")return;const sec=ytPlayer.getCurrentTime()||0,dur=ytPlayer.getDuration()||0;$('elapsed').textContent=fmt(sec);$('duration').textContent=fmt(dur);if(dur)$('seek').value=sec/dur*100;if($('stageElapsed'))$('stageElapsed').textContent=fmt(sec);if($('stageDuration'))$('stageDuration').textContent=fmt(dur);if(dur&&$('stageSeek'))$('stageSeek').value=sec/dur*100;{const lyricSecond=Math.max(0,mapVideoToLyricTime(sec));if(String(ultraStarCurrentId||'').startsWith('ultrastar_youtube_'))renderUltraStarStage(lyricSecond);else renderLyrics(lyricSecond)} }catch(e){}},String(ultraStarCurrentId||'').startsWith('ultrastar_youtube_')?70:200)}
 function normMatch(x){return String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
 function cleanYoutubeTitle(x){return String(x||"").replace(/\([^)]*(official|officiel|lyrics?|paroles|karaoke|karaoké|audio|video|clip)[^)]*\)/ig," ").replace(/\[[^\]]*(official|officiel|lyrics?|paroles|karaoke|karaoké|audio|video|clip)[^\]]*\]/ig," ").replace(/\b(official|officiel|lyrics?|paroles|karaoke|karaoké|instrumental|audio|video|clip|hd|4k)\b/ig," ").replace(/\s+/g," ").trim()}
 function guessTitleArtist(query,videoTitle="",channelTitle=""){
@@ -254,20 +254,22 @@ function videoSyncMap(){try{return JSON.parse(localStorage.getItem(VIDEO_SYNC_KE
 function syncKey(){return currentYoutubeId?currentYoutubeId:""}
 function currentSyncProfile(){const k=syncKey();if(!k)return null;return videoSyncMap()[k]||null}
 function saveSyncProfile(p){const k=syncKey();if(!k)return;const m=videoSyncMap();m[k]={...(m[k]||{}),...p,updatedAt:Date.now()};localStorage.setItem(VIDEO_SYNC_KEY,JSON.stringify(m));updateVideoSyncStatus()}
-function setOffset(v,label="Sync vidéo"){lyricOffset=Math.max(-20,Math.min(20,Math.round(Number(v||0)*10)/10));if($('offsetValue'))$('offsetValue').textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s';updateStageOffset();if(label&&$('state'))$('state').textContent=label}
+function setOffset(v,label="Sync vidéo"){lyricOffset=Math.max(-90,Math.min(90,Math.round(Number(v||0)*10)/10));if($('offsetValue'))$('offsetValue').textContent=(lyricOffset>0?'+':'')+lyricOffset.toFixed(1)+' s';updateStageOffset();if(label&&$('state'))$('state').textContent=label}
 function saveVideoOffset(){if(!syncKey())return;saveSyncProfile({globalOffset:lyricOffset,title:currentYoutubeTitle||""})}
 function loadVideoSync(){const p=currentSyncProfile();setOffset(Number(p?.globalOffset||0),'');updateVideoSyncStatus();return p}
 function mapVideoToLyricTime(videoTime){
   const p=currentSyncProfile(), a=(p?.anchors||[]).filter(x=>Number.isFinite(x.videoTime)&&Number.isFinite(x.lyricTime)).sort((x,y)=>x.videoTime-y.videoTime);
+  // Pour UltraStar + YouTube, les boutons +/- doivent rester utiles après un recalage à plusieurs repères.
+  const manualAdjustment=String(ultraStarCurrentId||'').startsWith('ultrastar_youtube_')&&Number.isFinite(p?.anchorOffsetBase)?lyricOffset-p.anchorOffsetBase:0;
   if(!a.length)return videoTime+lyricOffset;
-  if(a.length===1)return videoTime+(a[0].lyricTime-a[0].videoTime);
+  if(a.length===1)return videoTime+(a[0].lyricTime-a[0].videoTime)+manualAdjustment;
   let left=a[0],right=a[1];
   if(videoTime<=a[0].videoTime){left=a[0];right=a[1]}
   else if(videoTime>=a[a.length-1].videoTime){left=a[a.length-2];right=a[a.length-1]}
   else for(let i=0;i<a.length-1;i++)if(videoTime>=a[i].videoTime&&videoTime<=a[i+1].videoTime){left=a[i];right=a[i+1];break}
-  const span=right.videoTime-left.videoTime;if(Math.abs(span)<.05)return videoTime+(left.lyricTime-left.videoTime);
+  const span=right.videoTime-left.videoTime;if(Math.abs(span)<.05)return videoTime+(left.lyricTime-left.videoTime)+manualAdjustment;
   const ratio=(videoTime-left.videoTime)/span;
-  return left.lyricTime+(right.lyricTime-left.lyricTime)*ratio;
+  return left.lyricTime+(right.lyricTime-left.lyricTime)*ratio+manualAdjustment;
 }
 function updateVideoSyncStatus(){const el=$('videoSyncStatus');if(!el)return;const p=currentSyncProfile(),n=p?.anchors?.length||0;el.textContent=!currentYoutubeId?'Aucune vidéo chargée':n?`Sync vidéo ✓ · ${n} repère${n>1?'s':''}`:(p?'Sync vidéo ✓ · décalage mémorisé':'Sync vidéo · aucun repère')}
 function addCurrentLineAnchor(){
@@ -425,10 +427,11 @@ function parseUltraStar(txt){
   const meta={}, raw=[]; let cur=[];
   const rx=/^([:*FRG])\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/;
   for(let line of txt.split(/\r?\n/)){
-    line=line.trimEnd();
+    // Les espaces après chaque syllabe séparent les mots UltraStar : ne pas les supprimer.
+    line=line.replace(/\r$/,'');
     if(line.startsWith("#")&&line.includes(":")){const i=line.indexOf(":");meta[line.slice(1,i).toUpperCase()]=line.slice(i+1).trim();continue}
     if(line.startsWith("-")){if(cur.length){raw.push(cur);cur=[]}continue}
-    if(line==="E")break
+    if(line.trim()==="E")break
     const m=line.match(rx);if(m)cur.push({start:+m[2],dur:+m[3],pitch:+m[4],text:m[5]});
   }
   if(cur.length)raw.push(cur);
