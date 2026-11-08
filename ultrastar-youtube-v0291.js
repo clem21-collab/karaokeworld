@@ -79,8 +79,10 @@
       // Un seul clic au premier mot replace toutes les notes UltraStar sur cette vidéo.
       setOffset(group.start_s-now,'');
     }
-    anchors=anchors.filter(a=>Math.abs(a.lyricTime-group.start_s)>.03);
-    anchors.push({videoTime:Math.round(now*100)/100,lyricTime:group.start_s});
+    const manualAdjustment=!first&&Number.isFinite(existing.anchorOffsetBase)?lyricOffset-existing.anchorOffsetBase:0;
+    const target=group.start_s-manualAdjustment;
+    anchors=anchors.filter(a=>a.phraseIndex!==index&&Math.abs(a.lyricTime-group.start_s)>.03&&Math.abs(a.lyricTime-target)>.03);
+    anchors.push({videoTime:Math.round(now*100)/100,lyricTime:target,phraseIndex:index});
     anchors.sort((a,b)=>a.videoTime-b.videoTime);
     if(anchors.some((a,i)=>i>0&&(a.videoTime-anchors[i-1].videoTime<.05||a.lyricTime<=anchors[i-1].lyricTime))){$('kwYtUsSyncStatus').textContent='Repère incohérent : choisis la phrase entendue à cet instant ou repars du début.';return}
     // Deux repères permettent aussi de corriger une dérive de vitesse/édition.
