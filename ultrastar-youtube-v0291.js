@@ -3,7 +3,7 @@
   try { if(window.parent!==window && /\/60ans(?:\/|$)/.test(window.parent.location.pathname)) return; } catch(e) {}
   if(window.KaraokeWorldUltraStarYouTube?.installed) return;
   const $=id=>document.getElementById(id);
-  const VERSION='0.29.2';
+  const VERSION='0.29.3';
   const clean=s=>String(s||'').trim();
   const norm=s=>clean(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   function hash(s){let h=2166136261;for(const ch of String(s)){h=Math.imul(h^ch.charCodeAt(0),16777619)}return (h>>>0).toString(16)}
@@ -31,6 +31,19 @@
     const id=String(typeof ultraStarCurrentId!=='undefined'?ultraStarCurrentId:'');
     return id.startsWith('ultrastar_youtube_')&&Array.isArray(tracks)?tracks.find(t=>t.id===id&&t.ultraStar?.groups?.length):null;
   }
+  function formatSyllables(group){
+    let html='',word='';
+    const finishWord=()=>{if(word){html+='<span class="us-word">'+word+'</span>';word=''}};
+    for(const note of group.syllables||[]){
+      for(const part of String(note.text||'').split(/(\s+)/)){
+        if(!part)continue;
+        if(/^\s+$/.test(part)){finishWord();html+=' ';continue}
+        word+='<span class="us-syl" data-us-start="'+note.start_s+'" data-us-end="'+note.end_s+'">'+ultraStarEsc(part)+'</span>';
+      }
+    }
+    finishWord();
+    return html;
+  }
   function phraseLabel(group){
     return (group?.syllables||[]).map(x=>String(x.text||'')).join('').trim().replace(/\s+/g,' ').slice(0,95);
   }
@@ -48,6 +61,8 @@
       sel.appendChild(option);
     });
     $('kwYtUsFirstLine').textContent='1ère phrase : « '+(phraseLabel(t.ultraStar.groups[0])||'♪')+' »';
+    $('kwYtUsTiming').textContent='GAP du TXT : '+(t.ultraStar.gap/1000).toFixed(2)+' s · BPM : '+t.ultraStar.bpm+' · première note : '+t.ultraStar.groups[0].start_s.toFixed(2)+' s. Décalage positif = paroles avancées ; négatif = retardées.';
+    $('kwYtUsLegacyWarning').textContent=t.ultraStar.parserVersion===3?'':'Pour une ancienne importation dont les mots sont déjà collés, réimporte le TXT original : les espaces perdus ne peuvent pas être reconstitués automatiquement.';
     $('kwYtUsSyncStatus').textContent='Au moment où tu entends la première phrase, clique sur « Caler le début ». Si le texte se décale plus tard, sélectionne un passage et cale-le aussi.';
   }
   function calibrate(index,first=false){
@@ -57,7 +72,7 @@
     if(!group){$('kwYtUsSyncStatus').textContent='Choisis une phrase UltraStar.';return}
     let now;
     try{now=Number(ytPlayer?.getCurrentTime?.())}catch(e){}
-    if(!Number.isFinite(now)||now<0){$('kwYtUsSyncStatus').textContent='Lance la vidéo avant de caler les paroles.';return}
+    if(!Number.isFinite(now)||now<0||!(Number(ytPlayer?.getDuration?.())>0)){$('kwYtUsSyncStatus').textContent='Lance la vidéo avant de caler les paroles.';return}
     const existing=currentSyncProfile()||{};
     let anchors=first?[]:(Array.isArray(existing.anchors)?existing.anchors.filter(a=>Number.isFinite(a.videoTime)&&Number.isFinite(a.lyricTime)):[]);
     if(first){
@@ -67,6 +82,7 @@
     anchors=anchors.filter(a=>Math.abs(a.lyricTime-group.start_s)>.03);
     anchors.push({videoTime:Math.round(now*100)/100,lyricTime:group.start_s});
     anchors.sort((a,b)=>a.videoTime-b.videoTime);
+    if(anchors.some((a,i)=>i>0&&(a.videoTime-anchors[i-1].videoTime<.05||a.lyricTime<=anchors[i-1].lyricTime))){$('kwYtUsSyncStatus').textContent='Repère incohérent : choisis la phrase entendue à cet instant ou repars du début.';return}
     // Deux repères permettent aussi de corriger une dérive de vitesse/édition.
     if(anchors.length>12)anchors=anchors.slice(-12);
     const base=first||!Number.isFinite(existing.anchorOffsetBase)?lyricOffset:existing.anchorOffsetBase;
@@ -75,12 +91,16 @@
     $('kwYtUsSyncStatus').textContent='✅ '+(first?'Début':'Passage')+' calé à '+now.toFixed(1)+' s · '+anchors.length+' repère'+(anchors.length>1?'s':'')+' mémorisé'+(anchors.length>1?'s':'')+'. Les boutons ± 0,5 s restent disponibles pour affiner.';
   }
   function installSyncControls(){
+    document.documentElement.classList.add('kw-ultrastar-v0293');
     const anchor=$('videoSyncStatus');if(!anchor||$('kwYtUsSyncControls'))return;
     const box=document.createElement('div');
     box.id='kwYtUsSyncControls';box.className='kw-ytus-sync hidden';
     box.innerHTML=`
       <strong>🎯 Caler les paroles UltraStar sur cette vidéo</strong>
       <p id="kwYtUsFirstLine"></p>
+      <p id="kwYtUsTiming"></p>
+      <p id="kwYtUsLegacyWarning" role="status"></p>
+      <div class="kw-ytus-cal-row"><button type="button" class="secondary" id="kwYtUsFineMinus">− 0,1 s</button><button type="button" class="secondary" id="kwYtUsFinePlus">+ 0,1 s</button><span>Réglage enregistré pour cette chanson et cette vidéo</span></div>
       <div class="kw-ytus-cal-row">
         <button type="button" id="kwYtUsSyncFirst">🎤 Caler le début maintenant</button>
         <button type="button" class="secondary" id="kwYtUsSyncReset">↺ Repartir du TXT</button>
@@ -94,6 +114,14 @@
     `;
     anchor.insertAdjacentElement('afterend',box);
     const css=document.createElement('style');css.textContent=`
+      html.kw-ultrastar-v0293 :is(#lyrics,#stageLyrics) .us-line {
+        display:block!important;
+        white-space:normal!important;
+        overflow-wrap:anywhere!important;
+        text-wrap:balance!important;
+      }
+      html.kw-ultrastar-v0293 .us-word {display:inline-block;white-space:nowrap}
+      html.kw-ultrastar-v0293 .us-syl {display:inline!important}
       .kw-ytus-sync{margin:12px 0;padding:15px;border:1px solid rgba(220,157,93,.46);border-radius:14px;background:linear-gradient(125deg,rgba(35,26,35,.86),rgba(26,32,49,.85));}
       .kw-ytus-sync strong{color:#f6d3a3;font-size:1rem}
       .kw-ytus-sync p{color:#e5d5c4;font-size:.85rem;margin:9px 0;line-height:1.5}
@@ -101,6 +129,8 @@
       .kw-ytus-cal-row select{min-width:210px;min-height:40px;flex:1;padding:8px;border-radius:9px;background:#141b2a;border:1px solid #a36d4d;color:#f9efe4}
       @media(max-width:580px){.kw-ytus-cal-row>*{width:100%}}
     `;document.head.appendChild(css);
+    $('kwYtUsFineMinus').addEventListener('click',()=>{if(activeTxtTrack()){setOffset(lyricOffset-.1,'');saveVideoOffset()}});
+    $('kwYtUsFinePlus').addEventListener('click',()=>{if(activeTxtTrack()){setOffset(lyricOffset+.1,'');saveVideoOffset()}});
     $('kwYtUsSyncFirst').addEventListener('click',()=>calibrate(0,true));
     $('kwYtUsSyncAnchor').addEventListener('click',()=>calibrate(Number($('kwYtUsSyncLine').value),false));
     $('kwYtUsSyncReset').addEventListener('click',()=>{
@@ -154,7 +184,7 @@
           id:trackId,title,artist,genre:clean(parsed.meta.GENRE)||'Sans genre',
           emoji:'🎬',kind:'ultrastar-youtube',type:'youtube',created:Date.now(),
           youtubeId:id,lrc:parsed.lines,
-          ultraStar:{bpm:parsed.bpm,gap:parsed.gap,groups:parsed.groups,meta:parsed.meta,videoGap:0}
+          ultraStar:{bpm:parsed.bpm,gap:parsed.gap,groups:parsed.groups,meta:parsed.meta,sourceText:parsed.sourceText,parserVersion:parsed.parserVersion,videoGap:0}
         };
         await saveTrack(track);
         const old=tracks.findIndex(x=>x.id===trackId);
@@ -187,8 +217,11 @@
       }
       if(window.KaraokeWorldUltraStarYouTube.active){
         window.KaraokeWorldUltraStarYouTube.active=false;
-        try {ytPlayer?.pauseVideo?.()}catch(e){}
+        ++youtubeRequest;
         try {clearInterval(ytTimer)}catch(e){}
+        try {ytPlayer?.pauseVideo?.();ytPlayer?.destroy?.()}catch(e){}
+        ytPlayer=null;
+        currentYoutubeId='';
       }
       showCalibration(null);
       return previous.apply(this,arguments);
@@ -198,7 +231,7 @@
     window.playTrack=wrapper;
   }
   function init(){panel();installSyncControls();hookPlayTrack()}
-  window.KaraokeWorldUltraStarYouTube={installed:true,version:VERSION,active:false,readYoutubeId:getYoutubeId,showCalibration};
+  window.KaraokeWorldUltraStarYouTube={installed:true,version:VERSION,active:false,readYoutubeId:getYoutubeId,showCalibration,formatSyllables,calibrate};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
   [600,1800,4000].forEach(ms=>setTimeout(hookPlayTrack,ms));
 })();
