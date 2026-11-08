@@ -58,24 +58,60 @@
     await (await caches.open(CACHE_NAME)).put(cacheKey(file),new Response(blob,{headers:{'Content-Type':'video/mp4'}}));
   }
 
-  function waitPlayable(v,timeout=4500){
+  function waitForVideo(v,timeout=12000){
     return new Promise(resolve=>{
-      let done=false;
-      const end=ok=>{if(done)return;done=true;clearTimeout(timer);v.removeEventListener('loadedmetadata',okFn);v.removeEventListener('canplay',okFn);v.removeEventListener('error',errFn);resolve(ok)};
-      const okFn=()=>end(true),errFn=()=>end(false),timer=setTimeout(()=>end(v.readyState>=1),timeout);
-      v.addEventListener('loadedmetadata',okFn,{once:true});v.addEventListener('canplay',okFn,{once:true});v.addEventListener('error',errFn,{once:true});
+      let ended=false;
+      const finish=result=>{
+        if(ended)return;
+        ended=true;
+        clearTimeout(timer);
+        for(const event of ['loadedmetadata','loadeddata','canplay','resize'])v.removeEventListener(event,check);
+        v.removeEventListener('error',error);
+        resolve(result);
+      };
+      const check=()=>{
+        if(v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2)finish({playable:true});
+      };
+      const error=()=>{
+        const code=v.error?.code||0;
+        const detail=v.error?.message||'';
+        finish({playable:false,reason:'Erreur de lecture '+code+(detail?' · '+detail:'')});
+      };
+      const timer=setTimeout(()=>finish({playable:false,reason:'Délai de vérification dépassé ('+Math.round(timeout/1000)+' s)'}),timeout);
+      for(const event of ['loadedmetadata','loadeddata','canplay','resize'])v.addEventListener(event,check);
+      v.addEventListener('error',error);
+      check();
     });
+  }
+
+  async function probeVideo(blob,timeout=12000){
+    if(!blob?.size)return {playable:false,reason:'Fichier vidéo vide'};
+    const v=document.createElement('video'),url=URL.createObjectURL(blob);
+    v.preload='auto';
+    v.muted=true;
+    v.playsInline=true;
+    const ready=waitForVideo(v,timeout);
+    try{v.src=url;v.load();return await ready}
+    finally{
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+      URL.revokeObjectURL(url);
+    }
   }
 
   async function applyBlob(blob,token,label='Vidéo prête'){
     if(token!==compat.token)return false;
     const v=videoElement();if(!v)return false;
     revoke(compat.playUrl);compat.playUrl=URL.createObjectURL(blob);
+    v.preload='auto';
+    const ready=waitForVideo(v);
     v.src=compat.playUrl;v.classList.remove('hidden');v.load();
-    const ok=await waitPlayable(v,5000);
+    const result=await ready;
+    const ok=result.playable;
     if(token!==compat.token)return false;
     if(ok){compat.ready=true;try{if(typeof ultraStarVideoUrl!=='undefined')ultraStarVideoUrl=compat.playUrl}catch(e){}hideProgress();setState(`UltraStar · ${label} ✓`);return true}
-    v.pause();v.removeAttribute('src');v.load();revoke(compat.playUrl);compat.playUrl='';return false;
+    v.classList.add('hidden');v.pause();v.removeAttribute('src');v.load();revoke(compat.playUrl);compat.playUrl='';return false;
   }
 
   function loadMpegtsLib(){
@@ -196,5 +232,5 @@
   window.syncUltraStarVideo=syncVideo;
   try{window.ultraStarVideoSupported=f=>VIDEO_RX.test(String(f?.name||f||''))}catch(e){}
 
-  window.KaraokeWorldVideoCompat={version:'0.26.0',matchConverted,getConverted,putConverted,clearConvertedCache:async()=>{try{await caches.delete(CACHE_NAME);return true}catch(e){return false}}};
+  window.KaraokeWorldVideoCompat={version:'0.26.0',probeVideo,matchConverted,getConverted,putConverted,clearConvertedCache:async()=>{try{await caches.delete(CACHE_NAME);return true}catch(e){return false}}};
 })();

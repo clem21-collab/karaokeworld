@@ -60,6 +60,7 @@ self.onmessage = async ev => {
     core.reset();
     if(code !== 0) throw new Error(`FFmpeg a retourné le code ${code}${lastError?` · ${lastError}`:''}`);
     const out = core.FS.readFile(output);
+    if(!out.byteLength)throw new Error('FFmpeg a produit un fichier vidéo vide');
     const copy = out.slice().buffer;
     try{ core.FS.unlink(input); }catch(e){}
     try{ core.FS.unlink(output); }catch(e){}

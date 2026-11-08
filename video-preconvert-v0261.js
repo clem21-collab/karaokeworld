@@ -67,7 +67,6 @@ function progress(f,label,p){const k=key(f),old=active.get(k),ph=phase(label),ol
 function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{if(currentRun&&!currentRun.finished)paint()},1000)}
 function stopTicker(){clearInterval(ticker);ticker=0}
 function settings(){if($('videoConcurrency'))return;const s=$('settings');if(!s)return;const d=document.createElement('div');d.innerHTML='<hr><h3>🎬 Conversion vidéo UltraStar</h3><p class="muted">Nombre de vidéos incompatibles préparées en même temps. Le changement est appliqué immédiatement à la file en cours.</p><div class="controls wrap" style="justify-content:flex-start"><label for="videoConcurrency">Conversions simultanées</label><select id="videoConcurrency"><option value="1">1 · Économie</option><option value="2">2 · Recommandé</option><option value="3">3 · Rapide</option><option value="4">4 · Très rapide</option></select><span id="videoConcurrencyHint" class="status"></span></div>';s.appendChild(d);const sel=$('videoConcurrency'),hint=$('videoConcurrencyHint'),sync=()=>{sel.value=String(concurrency());hint.textContent=`${concurrency()} à la fois`};sel.onchange=()=>{setConcurrency(sel.value);sync();if(currentRun&&!currentRun.paused)currentRun.pump();paint(`Limite modifiée : ${concurrency()} conversion${concurrency()>1?'s':''} simultanée${concurrency()>1?'s':''}`)};sync()}
-function playable(blob,ms=3500){return new Promise(r=>{const v=document.createElement('video'),u=URL.createObjectURL(blob);let x=0;const end=ok=>{if(x)return;x=1;clearTimeout(t);v.removeAttribute('src');try{v.load()}catch(e){}URL.revokeObjectURL(u);r(ok)},hasVideo=()=>v.videoWidth>0&&v.videoHeight>0,t=setTimeout(()=>end(hasVideo()),ms);v.preload='metadata';v.muted=true;v.onloadedmetadata=()=>end(hasVideo());v.oncanplay=()=>end(hasVideo());v.onerror=()=>end(false);v.src=u;v.load()})}
 function cancelAllWorkers(){for(const task of [...workerTasks.values()])task.cancel()}
 async function convert(f,mode,cb,run){
   const buf=await f.arrayBuffer();
@@ -114,24 +113,25 @@ async function prepareOne(f,run){
   const known=await knownResult(f,run.retry);
   if(run.finished||run.paused)return {status:'paused'};
   if(known)return known;
-  const native=await playable(f);
+  const native=await cacheApi().probeVideo(f);
   if(run.finished||run.paused)return {status:'paused'};
-  if(native){const result={status:'native'};saveResult(f,result);return result}
+  if(native.playable){const result={status:'native'};saveResult(f,result);return result}
 
   const attempts=[['remux','Adaptation rapide'],['transcode','Conversion MP4 H.264/AAC']];
-  const reasons=[];
+  const reasons=['Lecture directe · '+native.reason];
   for(const [mode,label] of attempts){
     progress(f,label+'…',0);
     const result=await convert(f,mode,p=>progress(f,label+'…',p),run);
     if(result.cancelled||run.finished||run.paused)return {status:'paused'};
-    const readable=result.blob&&await playable(result.blob);
+    const check=result.blob?await cacheApi().probeVideo(result.blob):null;
+    const readable=check?.playable;
     if(run.finished||run.paused)return {status:'paused'};
     if(readable){
       try{await cacheApi().putConverted(f,result.blob)}
       catch(error){const failed={status:'failed',reason:'Enregistrement en cache impossible · '+errorMessage(error)};saveResult(f,failed);return failed}
       const converted={status:'converted'};saveResult(f,converted);return converted;
     }
-    reasons.push(label+' · '+(result.reason||'résultat illisible par le navigateur'));
+    reasons.push(label+' · '+(result.reason||check?.reason||'résultat illisible par le navigateur'));
   }
   const failed={status:'failed',reason:reasons.join(' / ')};
   saveResult(f,failed);
