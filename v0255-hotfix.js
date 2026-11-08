@@ -45,8 +45,7 @@
     {src:'./drive-incremental-upload-v0286.js?v=0290',key:'drive-incremental-upload'},
     {src:'./library-update-simple-v0287.js?v=0290',key:'library-update-simple'},
     {src:'./library-ai-auto-v0288.js?v=0290',key:'library-ai-auto'},
-    {src:'./public-catalog-v0290.js?v=0290',key:'public-catalog'},
-    {src:'./version-display-v0280.js?v=0290',key:'version-display'}
+    {src:'./public-catalog-v0290.js?v=0290',key:'public-catalog'}
   ];
   function load(i=0){
     if(i>=addons.length)return;

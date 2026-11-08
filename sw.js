@@ -1,7 +1,8 @@
-const CACHE="karaokeworld-v0.29.2-ultrastar-lyrics-and-sync";
+const CACHE="karaokeworld-v0.29.2-release-version-fix";
 const FILES=["./november-nights.js","./november-nights.css","./","./index.html","./style.css","./v0255-hotfix.css","./video-compat-v0260.css","./app.js","./ultrastar-youtube-v0291.js","./recently-sung.js","./song-covers.js","./youtube-lrclib-smart-match.js","./v0255-hotfix.js","./video-compat-v0260.js","./video-preconvert-v0261.js","./video-compat-worker-v0260.js","./cloud-ultrastar-v0266.js","./public-starter-v0266.js","./hotfix-v0267.js","./video-once-v0272.js","./library-dedupe-v0275.js","./vocal-separation-v0276.js","./vocal-button-fix-v0277.js","./vocal-loudness-v0278.js","./drive-token-expiry-v0280.js","./drive-oauth-default-v0281.js","./drive-oauth-refresh-v0281.js","./nav-ultrastar-scope-v0284.js","./ultrastar-folder-sync-v0285.js","./drive-incremental-upload-v0286.js","./library-update-simple-v0287.js","./library-ai-auto-v0288.js","./public-catalog-v0290.js","./version-display-v0280.js","./manifest.webmanifest"];
 const BYPASS=new Set(["sitemap.xml","robots.txt"]);
 const PRESERVE=new Set(["karaokeworld-converted-video-v1","karaokeworld-instrumental-v1","web-demix2-models"]);
+const SHELL_PATHS=new Set(FILES.map(path=>new URL(path,self.location.href).pathname));
 
 self.addEventListener("install",e=>e.waitUntil((async()=>{
   const c=await caches.open(CACHE);
@@ -16,7 +17,7 @@ self.addEventListener("install",e=>e.waitUntil((async()=>{
 
 self.addEventListener("activate",e=>e.waitUntil(
   caches.keys()
-    .then(keys=>Promise.all(keys.filter(k=>k!==CACHE&&!PRESERVE.has(k)).map(k=>caches.delete(k))))
+    .then(keys=>Promise.all(keys.filter(k=>/^karaokeworld-v\d+\.\d+\.\d+-/.test(k)&&k!==CACHE&&!PRESERVE.has(k)).map(k=>caches.delete(k))))
     .then(()=>self.clients.claim())
 ));
 
@@ -29,11 +30,23 @@ self.addEventListener("fetch",e=>{
     e.respondWith(fetch(e.request,{cache:"no-store"}));return;
   }
   if(u.origin!==location.origin)return;
+  const shell=SHELL_PATHS.has(u.pathname);
   e.respondWith(
-    fetch(e.request).then(resp=>{
-      const clone=resp.clone();
-      caches.open(CACHE).then(c=>c.put(e.request,clone));
+    fetch(e.request,{cache:shell?"no-cache":"default"}).then(resp=>{
+      if(resp.ok&&resp.status!==206){
+        const clone=resp.clone();
+        e.waitUntil(caches.open(CACHE).then(c=>c.put(e.request,clone)).catch(()=>{}));
+      }
       return resp;
-    }).catch(()=>caches.match(e.request).then(hit=>hit||caches.match("./index.html")))
+    }).catch(async()=>{
+      const c=await caches.open(CACHE);
+      const hit=await c.match(e.request,{ignoreSearch:shell});
+      if(hit)return hit;
+      if(e.request.mode==="navigate"){
+        const page=await c.match("./index.html");
+        if(page)return page;
+      }
+      return Response.error();
+    })
   );
 });
