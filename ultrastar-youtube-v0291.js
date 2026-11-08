@@ -99,7 +99,7 @@
         if(typeof showPage==='function')showPage('home');
         const q=t.artist+' - '+t.title;
         $('onlineQuery').value=q;
-        if(typeof youtubeEmbed==='function')youtubeEmbed(t.youtubeId,q,q,t.artist,{ultraStar:t.ultraStar,trackId:t.id});
+        if(typeof youtubeEmbed==='function')youtubeEmbed(t.youtubeId,q,q,t.artist,{ultraStar:t.ultraStar,lrc:t.lrc,trackId:t.id});
         return;
       }
       if(window.KaraokeWorldUltraStarYouTube.active){
@@ -110,6 +110,7 @@
       return previous.apply(this,arguments);
     };
     wrapper._kwYtUs=true;
+    if(previous._kwVoiceFixV0277)wrapper._kwVoiceFixV0277=true;
     window.playTrack=wrapper;
   }
   function init(){panel();hookPlayTrack()}
