@@ -1,1 +1,44 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KaraokeWorld — Test correspondance</title><link rel="stylesheet" href="./style.css"></head><body><main style="max-width:1000px;margin:40px auto;padding:20px"><section class="panel online-panel" id="lyrics-search"><div class="row-head"><h2>🎤 KaraokeWorld — Test nouveau moteur</h2><span class="status">MULTI-SOURCES</span></div><p class="muted">Teste l’identification d’une version avec LRCLIB, SyncLRC et LiriQo, puis vérifie ses paroles synchronisées sur une vidéo YouTube.</p></section><section class="panel online-panel" id="kwSyncPlayer"><div class="row-head"><h2>🎬 Test réel de synchronisation</h2><span class="status">LRC + VIDÉO</span></div><p class="muted">Après avoir choisi un candidat, colle la vidéo exacte à tester. KaraokeWorld tient maintenant compte des clips qui ont une intro plus longue que la chanson.</p><div class="online-search"><input id="kwYoutubeUrl" value="https://www.youtube.com/watch?v=kjVeown7umM" placeholder="Lien YouTube exact…"><button id="kwLoadVideo">Charger la vidéo</button></div><div id="kwVideoHost" style="margin-top:14px;aspect-ratio:16/9;max-width:760px"></div><div id="kwSyncInfo" class="muted" style="margin-top:12px">Choisis d’abord un candidat de paroles.</div><div id="kwLiveLyrics" class="lyrics" style="margin-top:12px;min-height:150px"><div class="artist">Paroles non chargées</div><div class="highlight">La ligne active apparaîtra ici ✨</div></div></section><p><a href="./">← Retour à KaraokeWorld</a></p></main><script src="https://www.youtube.com/iframe_api"></script><script src="./track-identity.js?v=6"></script><script src="./track-match-ui.js?v=6"></script></body></html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KaraokeWorld — Test correspondance</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./track-ultrastar-sync.css"></head><body><main style="max-width:1000px;margin:40px auto;padding:20px"><section class="panel online-panel" id="lyrics-search"><div class="row-head"><h2>🎤 KaraokeWorld — Test nouveau moteur</h2><span class="status">MULTI-SOURCES</span></div><p class="muted">Teste l’identification d’une version avec LRCLIB, SyncLRC et LiriQo, puis vérifie ses paroles synchronisées sur une vidéo YouTube.</p></section><section class="panel online-panel" id="kwSyncPlayer"><div class="row-head"><h2>🎬 Test réel de synchronisation</h2><span class="status">LRC + VIDÉO</span></div><p class="muted">Après avoir choisi un candidat, colle la vidéo exacte à tester. KaraokeWorld tient maintenant compte des clips qui ont une intro plus longue que la chanson.</p><div class="online-search"><input id="kwYoutubeUrl" value="https://www.youtube.com/watch?v=kjVeown7umM" placeholder="Lien YouTube exact…"><button id="kwLoadVideo">Charger la vidéo</button></div><div id="kwVideoHost" style="margin-top:14px;aspect-ratio:16/9;max-width:760px"></div><div id="kwSyncInfo" class="muted" style="margin-top:12px">Choisis d’abord un candidat de paroles.</div><div id="kwLiveLyrics" class="lyrics" style="margin-top:12px;min-height:150px"><div class="artist">Paroles non chargées</div><div class="highlight">La ligne active apparaîtra ici ✨</div></div></section>
+<section class="panel online-panel" id="usSync" aria-labelledby="usHeading">
+  <div class="row-head"><h2 id="usHeading">🎤 Synchronisation UltraStar + YouTube</h2><span class="status" id="usVersion"></span></div>
+  <label class="us-file-label">Importer un fichier UltraStar (.txt)<input id="usFile" type="file" accept=".txt,text/plain"></label>
+  <p id="usImportStatus" class="muted" role="status">Le TXT suffit pour afficher les paroles avec une vidéo YouTube.</p>
+  <h3 id="usTitle"></h3><p id="usMeta" class="muted"></p>
+  <label for="usUrl">Lien YouTube</label>
+  <div class="online-search"><input id="usUrl" type="url" placeholder="https://www.youtube.com/watch?v=…"><button id="usLoad" type="button">Charger la vidéo</button></div>
+  <button id="usExample" type="button" class="secondary">Utiliser la vidéo de Yannick</button>
+  <p id="usVideoStatus" class="muted" role="status"></p>
+  <div id="usPlayer" hidden></div>
+  <a id="usWatch" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Ouvrir sur YouTube</a>
+  <div class="us-sync-lyrics" aria-label="Paroles synchronisées">
+    <div id="usPrevious" class="muted"></div>
+    <div id="usCurrent">Importe un TXT UltraStar.</div>
+    <div id="usNext" class="muted"></div>
+  </div>
+  <div class="controls wrap">
+    <button id="usPlay" type="button" disabled>▶ Reprendre</button><button id="usPause" type="button" class="secondary" disabled>⏸ Pause</button>
+    <button id="usBack" type="button" class="secondary" disabled>−5 s</button><button id="usForward" type="button" class="secondary" disabled>+5 s</button>
+    <span>Vidéo <output id="usTime">—</output></span>
+  </div>
+  <fieldset id="usSettings" disabled>
+    <legend>Décalage des paroles</legend>
+    <p class="muted">Une valeur positive retarde les paroles. Une valeur négative les avance.</p>
+    <div class="controls wrap">
+      <label>Décalage en ms <input id="usOffset" type="number" step="1" value="0"></label>
+      <button type="button" data-us-offset="-500" class="secondary">−0,5 s</button>
+      <button type="button" data-us-offset="-100" class="secondary">−0,1 s</button>
+      <button type="button" data-us-offset="100" class="secondary">+0,1 s</button>
+      <button type="button" data-us-offset="500" class="secondary">+0,5 s</button>
+      <button id="usReset" type="button" class="secondary">Revenir au GAP d’origine</button>
+    </div>
+    <p id="usGap" class="muted"></p>
+    <div class="controls wrap">
+      <label id="usSingerLabel" hidden>Partie <select id="usSinger"><option value="1">P1</option><option value="2">P2</option></select></label>
+      <label class="us-phrase-label">Phrase à tester <select id="usPhrase"></select></label>
+      <button id="usJump" type="button" class="secondary" disabled>Aller juste avant la phrase</button>
+    </div>
+    <p><label><input id="usIncludeVideo" type="checkbox"> Inscrire la référence YouTube dans #VIDEO si le champ est libre ou contient déjà une vidéo YouTube</label></p>
+    <p class="muted">La référence YouTube est lisible dans KaraokeWorld. Garde la case décochée pour conserver le lien ou le nom de fichier vidéo du TXT.</p>
+    <button id="usDownload" type="button" disabled>Télécharger le TXT corrigé</button>
+  </fieldset>
+</section><p><a href="./">← Retour à KaraokeWorld</a></p></main><script src="https://www.youtube.com/iframe_api"></script><script src="./track-identity.js?v=6"></script><script src="./track-match-ui.js?v=6"></script><script src="./track-ultrastar-sync.js"></script></body></html>

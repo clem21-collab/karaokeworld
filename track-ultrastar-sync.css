@@ -1,0 +1,23 @@
+#usSync { border-color:#8b538d; }
+#usSync .us-file-label { display:grid; gap:8px; }
+#usSync #usPlayer { width:100%; aspect-ratio:16/9; min-height:200px; margin:12px 0; background:#0f0a18; border-radius:12px; overflow:hidden; }
+#usSync #usPlayer iframe { display:block; width:100%; height:100%; border:0; }
+#usSync .us-sync-lyrics { margin-top:16px; min-height:132px; padding:14px; border-radius:12px; text-align:center; background:#170d22; display:grid; gap:8px; align-content:center; overflow-wrap:anywhere; }
+#usCurrent { font-size:clamp(1.35rem,4vw,2.25rem); font-weight:800; line-height:1.3; }
+#usCurrent .us-sync-note { white-space:pre-wrap; color:#f4e7fc; }
+@supports (background-clip:text) {
+  #usCurrent .us-sync-note {
+    background:linear-gradient(90deg,#ffac49 var(--progress,0%),#f4e7fc var(--progress,0%));
+    background-clip:text;
+    color:transparent;
+  }
+  #usCurrent .us-sync-note[data-type="*"] { background-image:linear-gradient(90deg,#ffcf70 var(--progress,0%),#f4e7fc var(--progress,0%)); }
+}
+#usSync fieldset { min-width:0; margin:16px 0 0; border:1px solid #774683; border-radius:12px; padding:12px; }
+#usSync #usOffset { width:108px; }
+#usSync .us-phrase-label { min-width:0; max-width:100%; display:grid; gap:4px; flex:1 1 220px; }
+#usSync #usPhrase { width:100%; text-overflow:ellipsis; }
+#usSync a { color:#ffc07d; }
+#usSync :focus-visible { outline:2px solid #ffc07d; outline-offset:3px; }
+#usSync [hidden] { display:none!important; }
+
