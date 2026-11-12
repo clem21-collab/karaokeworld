@@ -1,9 +1,9 @@
-/* KaraokeWorld v0.29.4 — affichage de version stable */
+/* KaraokeWorld v0.29.5 — affichage de version stable */
 (()=>{
   if(window.KaraokeWorldVersionDisplay?.installed)return;
   let birthday=false;
   try{birthday=window.parent!==window&&/\/60ans(?:\/|$)/.test(window.parent.location.pathname)}catch(e){}
-  const VERSION=birthday?'0.29.0':(typeof APP_VERSION==='string'?APP_VERSION:'0.29.4');
+  const VERSION=birthday?'0.29.0':(typeof APP_VERSION==='string'?APP_VERSION:'0.29.5');
   const LABEL='BETA · v'+VERSION+' · Catalogue public 🌐';
 
   function install(){
