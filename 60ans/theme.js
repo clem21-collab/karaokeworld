@@ -4,7 +4,62 @@ const themeUrl=new URL('./theme.css?v=10',location.href).href;
 const q=(d,s)=>d.querySelector(s),qa=(d,s)=>[...d.querySelectorAll(s)];
 const el=(d,t,c,h='')=>{const x=d.createElement(t);if(c)x.className=c;if(h)x.innerHTML=h;return x};
 const clickPage=(d,p)=>q(d,`[data-page="${p}"]`)?.click();
-function search(d,text){const i=q(d,'#query');if(!i)return;i.value=text;i.dispatchEvent(new Event('input',{bubbles:true}));q(d,'#searchEverywhere')?.click()}
+function setLibraryQuery(d,text){
+ const i=q(d,'#query');if(!i)return;
+ i.value=text;
+ const local=q(d,'#kw60LibraryQuery'),top=q(d,'.kw60-top-search input');
+ if(local)local.value=text;if(top)top.value=text;
+ i.dispatchEvent(new d.defaultView.Event('input',{bubbles:true}));
+}
+function search(d,text){setLibraryQuery(d,text);clickPage(d,'library')}
+function searchYouTube(d){
+ const text=(q(d,'#query')?.value||'').trim();
+ clickPage(d,'home');
+ const input=q(d,'#onlineQuery');if(input)input.value=text;
+ q(d,'#youtubeSearch')?.click();
+ q(d,'#online')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function bindLibrarySearch(d){
+ const input=q(d,'#query'),button=q(d,'#searchEverywhere');
+ if(!input||!button)return;
+ input.placeholder='Rechercher dans ma bibliothèque…';
+ input.setAttribute('aria-label','Rechercher une chanson ou un artiste dans ma bibliothèque');
+ button.textContent='Ma bibliothèque';
+ button.onclick=()=>search(d,input.value);
+ if(!input.dataset.kw60SearchBound){
+  input.dataset.kw60SearchBound='1';
+  input.addEventListener('keydown',e=>{
+   if(e.key==='Enter'&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();search(d,input.value)}
+  },true);
+  input.addEventListener('input',()=>{
+   const local=q(d,'#kw60LibraryQuery'),top=q(d,'.kw60-top-search input');
+   if(local)local.value=input.value;if(top)top.value=input.value;
+  });
+ }
+ if(!q(d,'#kw60YouTubeSearch')){
+  const online=el(d,'button','secondary','Rechercher sur YouTube');
+  online.id='kw60YouTubeSearch';online.type='button';online.onclick=()=>searchYouTube(d);
+  button.insertAdjacentElement('afterend',online);
+ }
+ const tools=q(d,'#librarySection .library-tools');if(!tools||q(d,'#kw60LibrarySearch'))return;
+ const box=el(d,'div','kw60-library-search');box.id='kw60LibrarySearch';
+ const label=el(d,'label','','Rechercher dans ma bibliothèque');
+ const field=el(d,'input');field.id='kw60LibraryQuery';field.type='search';
+ field.placeholder='Titre ou artiste…';field.value=input.value;field.setAttribute('aria-label','Rechercher dans ma bibliothèque');
+ field.addEventListener('input',()=>setLibraryQuery(d,field.value));
+ field.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();search(d,field.value)}});
+ label.appendChild(field);box.appendChild(label);
+ const online=el(d,'button','secondary','Rechercher sur YouTube');online.id='kw60CatalogueYouTube';online.type='button';online.onclick=()=>searchYouTube(d);box.appendChild(online);
+ tools.insertAdjacentElement('beforebegin',box);
+ const style=el(d,'style');style.id='kw60LibrarySearchStyle';style.textContent=`
+body.birthday60 .kw60-library-search{display:flex;align-items:end;gap:12px;margin:12px 0}
+body.birthday60 .kw60-library-search label{display:grid;gap:6px;flex:1;min-width:0;color:#f1ca70;font-size:13px}
+body.birthday60 .kw60-library-search input{width:100%;box-sizing:border-box;min-height:42px}
+body.birthday60 .kw60-library-search button{min-height:42px;white-space:nowrap}
+body.birthday60 .home-search input{min-width:0}
+@media(max-width:600px){body.birthday60 .home-search{flex-wrap:wrap}body.birthday60 .home-search input{flex:1 1 calc(100% - 40px);width:calc(100% - 40px)}body.birthday60 .home-search button{flex:1 1 auto}body.birthday60 .kw60-library-search{align-items:stretch;flex-direction:column}}
+`;d.head.appendChild(style);
+}
 function injectHead(d){
  if(!q(d,'#kw60ThemeCss')){const l=d.createElement('link');l.id='kw60ThemeCss';l.rel='stylesheet';l.href=themeUrl;d.head.appendChild(l)}
  if(!q(d,'#kw60HeroTextFix')){const s=d.createElement('style');s.id='kw60HeroTextFix';s.textContent=`
@@ -20,7 +75,7 @@ function buildTop(d){
   const nav=el(d,'div','kw60-topnav');
   [['home','⌂ Accueil'],['library','▦ Catalogue'],['playlist','☷ Playlists'],['library','♡ Favoris'],['library','♬ Préparation IA'],['settings','▲ Google Drive'],['settings','⚙ Paramètres']].forEach(([p,t],idx)=>{const b=el(d,'button',idx===0?'active':'',t);b.type='button';b.dataset.kwPage=p;if(idx===3)b.dataset.favs='1';b.onclick=()=>{clickPage(d,p);if(b.dataset.favs)setTimeout(()=>{const c=q(d,'#favoritesOnly');if(c&&!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}))}},80)};nav.appendChild(b)});header.insertBefore(nav,q(d,'.top-actions'));
  }
- if(!q(d,'.kw60-top-search')){const sr=el(d,'label','kw60-top-search','<span>⌕</span><input placeholder="Rechercher une chanson, un artiste...">');sr.querySelector('input').addEventListener('keydown',e=>{if(e.key==='Enter')search(d,e.target.value)});header.insertBefore(sr,q(d,'.top-actions'))}
+ if(!q(d,'.kw60-top-search')){const sr=el(d,'label','kw60-top-search','<span>⌕</span><input type="search" aria-label="Rechercher dans ma bibliothèque" placeholder="Rechercher dans ma bibliothèque…">');sr.querySelector('input').addEventListener('keydown',e=>{if(e.key==='Enter')search(d,e.target.value)});header.insertBefore(sr,q(d,'.top-actions'))}
  const top=q(d,'.top-actions');if(top&&!q(d,'.kw60-normal')){const b=el(d,'button','kw60-normal','↩ Version normale');b.type='button';b.onclick=()=>window.top.location.href='../';top.prepend(b)}
 }
 function buildSide(d){
@@ -42,6 +97,6 @@ function activePage(d){return q(d,'.nav.active')?.dataset.page||'home'}
 function syncPage(d){const p=activePage(d);qa(d,'.kw60-topnav button').forEach(b=>b.classList.toggle('active',b.dataset.kwPage===p&&!(p==='library'&&b.dataset.favs)));const b=q(d,'#kw60PageBanner');if(!b)return;const map={library:['▦ Catalogue de la soirée','Toutes les chansons prêtes pour les 60 ans de Laurent.'],playlist:['☷ Playlist de la soirée','Prépare l’ordre des chansons avant de lancer la fête.'],mic:['🎙 Micro & scène','Réglages micro, enceintes et ambiance pour la soirée.'],settings:['⚙ Paramètres de la soirée','Comptes, Google Drive, YouTube et sauvegarde.']};if(!map[p]){b.hidden=true;return}b.hidden=false;const html=`<div style="font-size:26px">${map[p][0].split(' ')[0]}</div><div><b>${map[p][0].slice(2)}</b><br><small>${map[p][1]}</small></div>`;if(b.innerHTML!==html)b.innerHTML=html}
 function observe(d){if(d.__kw60NavObserver)return;let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;syncPage(d)})};d.__kw60NavObserver=new MutationObserver(schedule);qa(d,'.nav').forEach(n=>d.__kw60NavObserver.observe(n,{attributes:true,attributeFilter:['class']}));d.addEventListener('click',e=>{if(e.target.closest('.nav,.kw60-topnav,.kw60-side-link'))schedule()},{passive:true})}
 function ready(){if(frame.classList.contains('is-ready'))return;frame.classList.add('is-ready');if(loader){loader.classList.add('is-ready');setTimeout(()=>{loader.hidden=true},360)}}
-function apply(){try{const d=frame.contentDocument;if(!d?.body)return;d.title='KaraokeWorld · Spécial 60 ans';d.body.classList.add('birthday60');injectHead(d);buildTop(d);buildSide(d);buildHero(d);relabel(d);pageBanner(d);observe(d);syncPage(d);ready()}catch(e){console.error('KaraokeWorld 60 ans',e);if(loader)loader.innerHTML='Impossible de charger la version 60 ans.<small>Recharge la page.</small>'}}
+function apply(){try{const d=frame.contentDocument;if(!d?.body)return;d.title='KaraokeWorld · Spécial 60 ans';d.body.classList.add('birthday60');injectHead(d);buildTop(d);buildSide(d);buildHero(d);relabel(d);bindLibrarySearch(d);pageBanner(d);observe(d);syncPage(d);ready()}catch(e){console.error('KaraokeWorld 60 ans',e);if(loader)loader.innerHTML='Impossible de charger la version 60 ans.<small>Recharge la page.</small>'}}
 frame.addEventListener('load',()=>{requestAnimationFrame(apply);setTimeout(apply,650)});
 })();
