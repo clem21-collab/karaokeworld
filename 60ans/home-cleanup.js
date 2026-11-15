@@ -16,7 +16,12 @@
         const s=d.createElement('style');
         s.id='kw60HomeCleanupStyle';
         s.textContent=`
-          body.birthday60.kw60-home-active #librarySection{display:none!important}
+          body.birthday60.kw60-home-active:not(.kw60-home-search-results) #librarySection{display:none!important}
+          body.birthday60.kw60-home-active.kw60-home-search-results #librarySection{display:block!important;scroll-margin-top:80px}
+          body.birthday60.kw60-home-active.kw60-home-search-results #favoritesSection,
+          body.birthday60.kw60-home-active.kw60-home-search-results #ideasSection,
+          body.birthday60.kw60-home-active.kw60-home-search-results #recentlySungSection,
+          body.birthday60.kw60-home-active #kw60LibrarySearch{display:none!important}
           body.birthday60.kw60-home-active #page-home{padding-bottom:12px!important}
         `;
         d.head.appendChild(s);

@@ -11,7 +11,20 @@ function setLibraryQuery(d,text){
  if(local)local.value=text;if(top)top.value=text;
  i.dispatchEvent(new d.defaultView.Event('input',{bubbles:true}));
 }
-function search(d,text){setLibraryQuery(d,text);clickPage(d,'library')}
+function syncHomeResults(d){
+ const searching=!!q(d,'#query')?.value.trim();
+ d.body.classList.toggle('kw60-home-search-results',searching);
+ const section=q(d,'#librarySection'),host=q(d,'#page-home');
+ if(section&&host&&host.firstElementChild!==section)host.prepend(section);
+ const title=q(d,'#librarySection h2');
+ if(title)title.textContent=activePage(d)==='home'&&searching?'Résultats dans ma bibliothèque':'♫ Catalogue de la soirée';
+}
+function search(d,text){
+ setLibraryQuery(d,text);
+ if(activePage(d)!=='library')clickPage(d,'home');
+ syncHomeResults(d);
+ q(d,text.trim()?'#librarySection':'#homeHero')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function searchYouTube(d){
  const text=(q(d,'#query')?.value||'').trim();
  clickPage(d,'home');
@@ -24,7 +37,7 @@ function bindLibrarySearch(d){
  if(!input||!button)return;
  input.placeholder='Rechercher dans ma bibliothèque…';
  input.setAttribute('aria-label','Rechercher une chanson ou un artiste dans ma bibliothèque');
- button.textContent='Ma bibliothèque';
+ button.textContent='Rechercher';
  button.onclick=()=>search(d,input.value);
  if(!input.dataset.kw60SearchBound){
   input.dataset.kw60SearchBound='1';
@@ -34,6 +47,7 @@ function bindLibrarySearch(d){
   input.addEventListener('input',()=>{
    const local=q(d,'#kw60LibraryQuery'),top=q(d,'.kw60-top-search input');
    if(local)local.value=input.value;if(top)top.value=input.value;
+   syncHomeResults(d);
   });
  }
  if(!q(d,'#kw60YouTubeSearch')){
@@ -94,7 +108,7 @@ function buildHero(d){
 function relabel(d){const set=(s,t)=>{const x=q(d,s);if(x&&x.textContent!==t)x.textContent=t};set('#favoritesSection h2','♥ Favoris de la soirée');set('#ideasSection h2','♛ Sélection spéciale 60 ans');set('#librarySection h2','♫ Catalogue de la soirée');set('#ultrastarPanel h2','🎤 Bibliothèque UltraStar · Soirée 60 ans');set('#online h2','🌐 Recherche karaoké en ligne');set('#lyrics-search h2','🎼 Paroles synchronisées');const ph=q(d,'#query');if(ph)ph.placeholder='Rechercher une chanson, un artiste, une ambiance...';const oq=q(d,'#onlineQuery');if(oq)oq.placeholder='Ex. Johnny Hallyday, Images, années 80...'}
 function pageBanner(d){if(q(d,'#kw60PageBanner'))return;const main=q(d,'main');if(!main)return;const b=el(d,'div','kw60-inline-banner');b.id='kw60PageBanner';b.hidden=true;main.prepend(b)}
 function activePage(d){return q(d,'.nav.active')?.dataset.page||'home'}
-function syncPage(d){const p=activePage(d);qa(d,'.kw60-topnav button').forEach(b=>b.classList.toggle('active',b.dataset.kwPage===p&&!(p==='library'&&b.dataset.favs)));const b=q(d,'#kw60PageBanner');if(!b)return;const map={library:['▦ Catalogue de la soirée','Toutes les chansons prêtes pour les 60 ans de Laurent.'],playlist:['☷ Playlist de la soirée','Prépare l’ordre des chansons avant de lancer la fête.'],mic:['🎙 Micro & scène','Réglages micro, enceintes et ambiance pour la soirée.'],settings:['⚙ Paramètres de la soirée','Comptes, Google Drive, YouTube et sauvegarde.']};if(!map[p]){b.hidden=true;return}b.hidden=false;const html=`<div style="font-size:26px">${map[p][0].split(' ')[0]}</div><div><b>${map[p][0].slice(2)}</b><br><small>${map[p][1]}</small></div>`;if(b.innerHTML!==html)b.innerHTML=html}
+function syncPage(d){syncHomeResults(d);const p=activePage(d);qa(d,'.kw60-topnav button').forEach(b=>b.classList.toggle('active',b.dataset.kwPage===p&&!(p==='library'&&b.dataset.favs)));const b=q(d,'#kw60PageBanner');if(!b)return;const map={library:['▦ Catalogue de la soirée','Toutes les chansons prêtes pour les 60 ans de Laurent.'],playlist:['☷ Playlist de la soirée','Prépare l’ordre des chansons avant de lancer la fête.'],mic:['🎙 Micro & scène','Réglages micro, enceintes et ambiance pour la soirée.'],settings:['⚙ Paramètres de la soirée','Comptes, Google Drive, YouTube et sauvegarde.']};if(!map[p]){b.hidden=true;return}b.hidden=false;const html=`<div style="font-size:26px">${map[p][0].split(' ')[0]}</div><div><b>${map[p][0].slice(2)}</b><br><small>${map[p][1]}</small></div>`;if(b.innerHTML!==html)b.innerHTML=html}
 function observe(d){if(d.__kw60NavObserver)return;let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;syncPage(d)})};d.__kw60NavObserver=new MutationObserver(schedule);qa(d,'.nav').forEach(n=>d.__kw60NavObserver.observe(n,{attributes:true,attributeFilter:['class']}));d.addEventListener('click',e=>{if(e.target.closest('.nav,.kw60-topnav,.kw60-side-link'))schedule()},{passive:true})}
 function ready(){if(frame.classList.contains('is-ready'))return;frame.classList.add('is-ready');if(loader){loader.classList.add('is-ready');setTimeout(()=>{loader.hidden=true},360)}}
 function apply(){try{const d=frame.contentDocument;if(!d?.body)return;d.title='KaraokeWorld · Spécial 60 ans';d.body.classList.add('birthday60');injectHead(d);buildTop(d);buildSide(d);buildHero(d);relabel(d);bindLibrarySearch(d);pageBanner(d);observe(d);syncPage(d);ready()}catch(e){console.error('KaraokeWorld 60 ans',e);if(loader)loader.innerHTML='Impossible de charger la version 60 ans.<small>Recharge la page.</small>'}}
