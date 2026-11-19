@@ -36,11 +36,11 @@
         const video=findSame(files,dir,videoName,VIDEO_RX),cover=findSame(files,dir,coverName,COVER_RX);
         const title=meta.TITLE||tf.name.replace(/\.txt$/i,''),artist=meta.ARTIST||'Artiste inconnu';
         const songId=safe(artist)+'--'+safe(title)+'--'+shortHash(dir+'|'+artist+'|'+title);
-        songs.push({songId,title,artist,dir,tf,audio,video,cover});
+        songs.push({songId,title,artist,dir,tf,audio,video,cover,duet:!!parsed.duet});
         if(i%30===0){progress(txts.length?Math.min(18,(i/txts.length)*18):0);await sleep(0)}
       }catch(e){console.warn('Analyse incrémentale UltraStar : TXT ignoré',tf?.name,e)}
     }
-    return songs;
+    return window.KaraokeWorldDuets?.prefer(songs)||songs;
   }
 
   async function listInventory(){

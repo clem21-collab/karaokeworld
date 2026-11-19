@@ -33,11 +33,11 @@
         const audio=findAudio(files,dir,audioName);if(!audio)continue;
         const title=meta.TITLE||tf.name.replace(/\.txt$/i,''),artist=meta.ARTIST||'Artiste inconnu';
         const songId=safe(artist)+'--'+safe(title)+'--'+shortHash(dir+'|'+artist+'|'+title);
-        out.push({songId,title,artist,audio});
+        out.push({songId,title,artist,audio,duet:!!parsed.duet});
         if(i%35===0)await sleep(0);
       }catch(e){console.warn('KaraokeWorld IA auto : TXT ignoré',tf?.name,e)}
     }
-    return out;
+    return window.KaraokeWorldDuets?.prefer(out)||out;
   }
 
   async function driveAudioInventory(){

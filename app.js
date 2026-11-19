@@ -3,7 +3,7 @@ const DB_NAME="karaokeworld_db", DB_VERSION=1, STORE="tracks";
 let db=null, tracks=[], queueIds=[], playlists=[], currentPlaylistId="default", favorites=[], currentId=null, activeGenre="Tous", lrc=[], micStream=null, audioCtx=null, analyser=null, micSource=null, micGain=null, micDelay=null, micWet=null, micMonitorGain=null, selectedSinkId="", raf=0, installPrompt=null, youtubeMode="karaoke", ytPlayer=null, ytTimer=0, lyricOffset=0, youtubeQuery="", currentYoutubeId="", currentYoutubeTitle="", currentYoutubeChannel="", stageLastIdx=-999, stageInfoTimer=0, countdownRunning=false;
 let cloudUser=null, cloudApi=null, cloudSaveTimer=0, cloudApplying=false;
 
-const APP_VERSION="0.29.5";
+const APP_VERSION="0.29.6";
 let waitingWorker=null, updateReloading=false;
 function showUpdate(worker){waitingWorker=worker;const t=$("updateToast");if(t)t.classList.remove("hidden")}
 async function setupAppUpdates(){
@@ -460,6 +460,7 @@ function syncUltraStarVideo(sec){
 function usNorm(s){return String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
 function usDecode(buf){const bytes=new Uint8Array(buf);if(bytes[0]===255&&bytes[1]===254)return new TextDecoder('utf-16le').decode(buf);if(bytes[0]===254&&bytes[1]===255)return new TextDecoder('utf-16be').decode(buf);for(const enc of ["utf-8","windows-1252","iso-8859-1"]){try{return new TextDecoder(enc,{fatal:enc==="utf-8"}).decode(buf)}catch(e){}}return new TextDecoder().decode(buf)}
 function parseUltraStar(txt){
+  const duet=window.KaraokeWorldDuets?.parse(txt);if(duet)return duet;
   const meta={}, raw=[]; let cur=[];
   const rx=/^([:*FRG])[ \t]+(-?\d+)[ \t]+(\d+)[ \t]+(-?\d+)(?:[ \t](.*))?$/;
   const sourceText=String(txt).replace(/^\uFEFF/,"");
@@ -483,7 +484,7 @@ function parseUltraStar(txt){
   return {meta,bpm,gap,groups,lines,sourceText,parserVersion:3};
 }
 async function importUltraStarFolder(fileList){
-  const files=[...fileList], txts=files.filter(f=>/\.txt$/i.test(f.name));let added=0,missing=0;
+  const files=[...fileList], txts=files.filter(f=>/\.txt$/i.test(f.name));let added=0,missing=0;const importedKeys=new Set(),importedVersions=new Map();
   const bad=[],videos=[];
   $("ultraStarStatus").textContent=`Analyse de ${txts.length} fichiers UltraStar…`;
   for(const tf of txts){
@@ -494,7 +495,10 @@ async function importUltraStarFolder(fileList){
       const audio=files.find(f=>wanted&&f.webkitRelativePath?.toLowerCase()===(dir+"/"+wanted).toLowerCase())||
                   files.find(f=>f.webkitRelativePath?.split("/").slice(0,-1).join("/")===dir&&/\.(mp3|ogg|m4a|wav)$/i.test(f.name));
       if(!audio){missing++;continue}
-      const id="ultrastar_"+usNorm((us.meta.ARTIST||"")+"_"+(us.meta.TITLE||tf.name))+"_"+added;
+      const songKey=usNorm((us.meta.ARTIST||"")+"|"+(us.meta.TITLE||tf.name));
+      if(importedVersions.get(songKey)&&!us.duet)continue;
+      const previous=tracks.find(x=>x.kind==="ultrastar"&&usNorm(x.artist+"|"+x.title)===songKey);
+      const id=previous?.id||("ultrastar_"+usNorm((us.meta.ARTIST||"")+"_"+(us.meta.TITLE||tf.name))+"_"+added);
       const coverName=(us.meta.COVER||"").split(/[\\/]/).pop();
       const cover=coverName?files.find(f=>f.webkitRelativePath===dir+"/"+coverName):null;
       // Un OGG audio ne doit pas être choisi comme vidéo par défaut.
@@ -507,8 +511,8 @@ async function importUltraStarFolder(fileList){
       const t={id,title:us.meta.TITLE||tf.name.replace(/\.txt$/i,""),artist:us.meta.ARTIST||"Artiste inconnu",genre:us.meta.GENRE||"Sans genre",emoji:"🎤",kind:"ultrastar",type:"audio",blob:audio,url:URL.createObjectURL(audio),created:Date.now(),lrc:us.lines,ultraStar:{bpm:us.bpm,gap:us.gap,groups:us.groups,meta:us.meta,sourceText:us.sourceText,parserVersion:us.parserVersion,video:videoName||"",videoGap:Number.isFinite(videoGapRaw)?videoGapRaw:0},videoBlob:video||null,videoName:video?.name||"",coverUrl:cover?URL.createObjectURL(cover):""};
       // session import: exact File objects remain local and are not uploaded
       tracks=tracks.filter(x=>!(x.kind==="ultrastar"&&usNorm(x.artist+"|"+x.title)===usNorm(t.artist+"|"+t.title)));
-      tracks.unshift(t);added++;
-      if(video)videos.push(video);
+      tracks.unshift(t);importedVersions.set(songKey,!!us.duet);if(!importedKeys.has(songKey)){importedKeys.add(songKey);added++}
+      if(video&&!videos.includes(video))videos.push(video);
     }catch(e){bad.push([tf.webkitRelativePath||tf.name,e.message||String(e)])}
   }
   drawTracks();drawPlaylists();
@@ -658,6 +662,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   $("ultraStarCatalog")?.addEventListener("click",openUltraStarCatalog);
 });
 
+window.KaraokeWorldDuets?.install();
 boot();
 
 

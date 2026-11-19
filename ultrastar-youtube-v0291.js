@@ -62,7 +62,7 @@
     });
     $('kwYtUsFirstLine').textContent='1ère phrase : « '+(phraseLabel(t.ultraStar.groups[0])||'♪')+' »';
     $('kwYtUsTiming').textContent='GAP du TXT : '+(t.ultraStar.gap/1000).toFixed(2)+' s · BPM : '+t.ultraStar.bpm+' · première note : '+t.ultraStar.groups[0].start_s.toFixed(2)+' s. Décalage positif = paroles avancées ; négatif = retardées.';
-    $('kwYtUsLegacyWarning').textContent=t.ultraStar.parserVersion===3?'':'Pour une ancienne importation dont les mots sont déjà collés, réimporte le TXT original : les espaces perdus ne peuvent pas être reconstitués automatiquement.';
+    $('kwYtUsLegacyWarning').textContent=t.ultraStar.parserVersion>=3?'':'Pour une ancienne importation dont les mots sont déjà collés, réimporte le TXT original : les espaces perdus ne peuvent pas être reconstitués automatiquement.';
     $('kwYtUsSyncStatus').textContent='Au moment où tu entends la première phrase, clique sur « Caler le début ». Si le texte se décale plus tard, sélectionne un passage et cale-le aussi.';
   }
   function calibrate(index,first=false){

@@ -147,7 +147,7 @@ async function buildSongs(fileList){
       songs.push({songId,title,artist,genre:meta.GENRE||'Sans genre',dir,tf,audio,video,cover,parsed});
     }catch(e){console.warn('UltraStar Drive: TXT ignoré',tf.name,e)}
   }
-  return songs;
+  return window.KaraokeWorldDuets?.prefer(songs)||songs;
 }
 async function createSongFolder(s,parentId){
   const name=(s.artist+' - '+s.title).replace(/[\r\n]+/g,' ').slice(0,180);return createDriveFolder(name,parentId,{kwSongId:s.songId,kwType:'song',kwApp:'KaraokeWorld'});
